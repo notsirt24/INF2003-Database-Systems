@@ -1,7 +1,7 @@
 // ============================================
-// Import CSV Data to PostgreSQL (UPDATED)
-// File: database/scripts/importData.js
-// Matches your exact CSV column headers
+// Import and Normalize CSV Data to PostgreSQL
+// File: database/scripts/import-normalized-data.js
+// Matches normalized schema design
 // ============================================
 
 const fs = require('fs');
@@ -10,7 +10,7 @@ const { Pool } = require('pg');
 const csv = require('csv-parser');
 require('dotenv').config();
 
-// Database connection configuration
+// Database connection
 const pool = new Pool({
   host: process.env.PG_HOST || 'localhost',
   port: process.env.PG_PORT || 5432,
@@ -22,7 +22,10 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
-// Helper function to read CSV
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 function readCSV(filePath) {
   return new Promise((resolve, reject) => {
     const results = [];
@@ -34,73 +37,141 @@ function readCSV(filePath) {
   });
 }
 
-// Helper function to clean string values
 function cleanString(value) {
   if (!value || value === 'na' || value === 'NA' || value === 'null') return null;
   return String(value).trim();
 }
 
-// Helper function to clean number values
 function cleanNumber(value) {
   if (!value || value === 'na' || value === 'NA' || value === 'null') return null;
   const num = parseFloat(value);
   return isNaN(num) ? null : num;
 }
 
+function parseRemainingLease(leaseStr) {
+  if (!leaseStr) return null;
+  const match = leaseStr.match(/(\d+)\s*years?/i);
+  return match ? parseInt(match[1]) : null;
+}
+
+function parseMonthToDate(monthStr) {
+  if (!monthStr) return null;
+  const [year, month] = monthStr.split('-');
+  return `${year}-${month}-01`;
+}
+
 // ============================================
-// 1. Import MRT Stations
+// 1. IMPORT AMENITIES
 // ============================================
-async function importMRTStations() {
-  console.log('\n📍 Importing MRT Stations...');
+
+async function importAmenities() {
+  console.log('\n🗺️  Importing Amenities...');
   const client = await pool.connect();
   
   try {
-    const dataPath = path.join(__dirname, '../../data/raw/MRT Stations.csv');
-    
-    if (!fs.existsSync(dataPath)) {
-      console.log('   ⚠️  File not found:', dataPath);
-      return;
-    }
-    
-    const data = await readCSV(dataPath);
-    console.log(`   Found ${data.length} MRT stations`);
-    
-    let imported = 0;
-    let skipped = 0;
-    
-    for (const row of data) {
-      const lat = cleanNumber(row.Latitude);
-      const lon = cleanNumber(row.Longitude);
+    let totalImported = 0;
+
+    // Import MRT Stations
+    console.log('   📍 Importing MRT Stations...');
+    const mrtPath = path.join(__dirname, '../../data/raw/MRT Stations.csv');
+    if (fs.existsSync(mrtPath)) {
+      const mrtData = await readCSV(mrtPath);
+      let mrtCount = 0;
       
-      if (!lat || !lon) {
-        skipped++;
-        continue;
+      for (const row of mrtData) {
+        const lat = cleanNumber(row.Latitude);
+        const lon = cleanNumber(row.Longitude);
+        
+        if (!lat || !lon) continue;
+        
+        await client.query(`
+          INSERT INTO amenity (amenity_type, name, code, geom)
+          VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326))
+        `, [
+          'MRT',
+          cleanString(row.STN_NAME),
+          cleanString(row.STN_NO),
+          lon,
+          lat
+        ]);
+        mrtCount++;
       }
-      
-      await client.query(`
-        INSERT INTO mrt_station (
-          objectid, stn_name, stn_no, geometry,
-          latitude, longitude, geom
-        ) VALUES ($1, $2, $3, $4, $5, $6, ST_SetSRID(ST_MakePoint($7, $8), 4326))
-      `, [
-        cleanNumber(row.OBJECTID),
-        cleanString(row.STN_NAME),
-        cleanString(row.STN_NO),
-        cleanString(row.geometry),
-        lat,
-        lon,
-        lon, // PostGIS uses (lon, lat) order
-        lat
-      ]);
-      
-      imported++;
+      console.log(`      ✅ Imported ${mrtCount} MRT stations`);
+      totalImported += mrtCount;
     }
-    
-    console.log(`   ✅ Successfully imported ${imported} MRT stations`);
-    if (skipped > 0) console.log(`   ⚠️  Skipped ${skipped} records (missing coordinates)`);
+
+    // Import Schools
+    console.log('   🏫 Importing Schools...');
+    const schoolPath = path.join(__dirname, '../../data/raw/Generalinformationofschools.csv');
+    if (fs.existsSync(schoolPath)) {
+      const schoolData = await readCSV(schoolPath);
+      let schoolCount = 0;
+      
+      for (const row of schoolData) {
+        await client.query(`
+          INSERT INTO amenity (amenity_type, name, code, meta)
+          VALUES ($1, $2, $3, $4)
+        `, [
+          'SCHOOL',
+          cleanString(row.school_name),
+          cleanString(row.postal_code),
+          JSON.stringify({
+            address: cleanString(row.address),
+            principal: cleanString(row.principal_name),
+            type: cleanString(row.type_code),
+            level: cleanString(row.mainlevel_code)
+          })
+        ]);
+        schoolCount++;
+      }
+      console.log(`      ✅ Imported ${schoolCount} schools`);
+      totalImported += schoolCount;
+    }
+
+    // Import EV Chargers
+    console.log('   ⚡ Importing EV Chargers...');
+    const evPath = path.join(__dirname, '../../data/raw/Electric_Vehicle_Charging_Points.csv');
+    if (fs.existsSync(evPath)) {
+      const evData = await readCSV(evPath);
+      let evCount = 0;
+      
+      for (const row of evData) {
+        const lat = cleanNumber(row.Latitude);
+        const lon = cleanNumber(row.Longitude);
+        
+        if (!lat || !lon) continue;
+        
+        await client.query(`
+          INSERT INTO amenity (amenity_type, name, operator, code, geom, meta)
+          VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7)
+        `, [
+          'EV_CHARGER',
+          cleanString(row.Name),
+          cleanString(row['Building Name']),
+          cleanString(row['EV Charger Registration Code']),
+          lon,
+          lat,
+          JSON.stringify({
+            outlets: cleanNumber(row['No. of Charging Outlets']),
+            connector_type: cleanString(row['Type of Connector']),
+            power_kw: cleanNumber(row['Rated Output Power (kW)']),
+            public: cleanString(row['Is the charger publicly accessible?'])
+          })
+        ]);
+        evCount++;
+        
+        if (evCount % 1000 === 0) {
+          console.log(`      Processing: ${evCount} / ${evData.length}`);
+        }
+      }
+      console.log(`      ✅ Imported ${evCount} EV chargers`);
+      totalImported += evCount;
+    }
+
+    console.log(`   ✅ Total amenities imported: ${totalImported}`);
     
   } catch (error) {
-    console.error('   ❌ Error importing MRT stations:', error.message);
+    console.error('   ❌ Error importing amenities:', error.message);
     throw error;
   } finally {
     client.release();
@@ -108,179 +179,12 @@ async function importMRTStations() {
 }
 
 // ============================================
-// 2. Import Schools
+// 2. IMPORT AND NORMALIZE RESALE DATA
 // ============================================
-async function importSchools() {
-  console.log('\n🏫 Importing Schools...');
-  const client = await pool.connect();
-  
-  try {
-    const dataPath = path.join(__dirname, '../../data/raw/Generalinformationofschools.csv');
-    
-    if (!fs.existsSync(dataPath)) {
-      console.log('   ⚠️  File not found:', dataPath);
-      return;
-    }
-    
-    const data = await readCSV(dataPath);
-    console.log(`   Found ${data.length} schools`);
-    
-    let imported = 0;
-    
-    for (const row of data) {
-      await client.query(`
-        INSERT INTO school (
-          school_name, url_address, address, postal_code,
-          telephone_no, telephone_no_2, fax_no, fax_no_2,
-          email_address, mrt_desc, bus_desc,
-          principal_name, first_vp_name, second_vp_name,
-          third_vp_name, fourth_vp_name, fifth_vp_name, sixth_vp_name,
-          dgp_code, zone_code, type_code, nature_code,
-          session_code, mainlevel_code,
-          sap_ind, autonomous_ind, gifted_ind, ip_ind,
-          mothertongue1_code, mothertongue2_code, mothertongue3_code
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-          $12, $13, $14, $15, $16, $17, $18,
-          $19, $20, $21, $22, $23, $24, $25, $26, $27, $28,
-          $29, $30, $31
-        )
-      `, [
-        cleanString(row.school_name),
-        cleanString(row.url_address),
-        cleanString(row.address),
-        cleanString(row.postal_code),
-        cleanString(row.telephone_no),
-        cleanString(row.telephone_no_2),
-        cleanString(row.fax_no),
-        cleanString(row.fax_no_2),
-        cleanString(row.email_address),
-        cleanString(row.mrt_desc),
-        cleanString(row.bus_desc),
-        cleanString(row.principal_name),
-        cleanString(row.first_vp_name),
-        cleanString(row.second_vp_name),
-        cleanString(row.third_vp_name),
-        cleanString(row.fourth_vp_name),
-        cleanString(row.fifth_vp_name),
-        cleanString(row.sixth_vp_name),
-        cleanString(row.dgp_code),
-        cleanString(row.zone_code),
-        cleanString(row.type_code),
-        cleanString(row.nature_code),
-        cleanString(row.session_code),
-        cleanString(row.mainlevel_code),
-        cleanString(row.sap_ind),
-        cleanString(row.autonomous_ind),
-        cleanString(row.gifted_ind),
-        cleanString(row.ip_ind),
-        cleanString(row.mothertongue1_code),
-        cleanString(row.mothertongue2_code),
-        cleanString(row.mothertongue3_code)
-      ]);
-      
-      imported++;
-    }
-    
-    console.log(`   ✅ Successfully imported ${imported} schools`);
-    console.log(`   ℹ️  Note: Latitude/Longitude for schools will need geocoding`);
-    
-  } catch (error) {
-    console.error('   ❌ Error importing schools:', error.message);
-    throw error;
-  } finally {
-    client.release();
-  }
-}
 
-// ============================================
-// 3. Import EV Chargers
-// ============================================
-async function importEVChargers() {
-  console.log('\n⚡ Importing EV Charging Points...');
-  const client = await pool.connect();
-  
-  try {
-    const dataPath = path.join(__dirname, '../../data/raw/Electric_Vehicle_Charging_Points.csv');
-    
-    if (!fs.existsSync(dataPath)) {
-      console.log('   ⚠️  File not found:', dataPath);
-      return;
-    }
-    
-    const data = await readCSV(dataPath);
-    console.log(`   Found ${data.length} EV charging points`);
-    
-    let imported = 0;
-    let skipped = 0;
-    
-    for (const row of data) {
-      const lat = cleanNumber(row.Latitude);
-      const lon = cleanNumber(row.Longitude);
-      
-      if (!lat || !lon) {
-        skipped++;
-        continue;
-      }
-      
-      await client.query(`
-        INSERT INTO ev_charger (
-          ev_charger_registration_code, name, no_of_charging_outlets,
-          connector_id, type_of_connector, rated_output_power_kw,
-          postal_code, block_house_no, street_name,
-          building_name, floor_no, lot_no,
-          is_charger_publicly_accessible, latitude, longitude, geom
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15,
-          ST_SetSRID(ST_MakePoint($16, $17), 4326)
-        )
-      `, [
-        cleanString(row['EV Charger Registration Code']),
-        cleanString(row.Name),
-        cleanNumber(row['No. of Charging Outlets']),
-        cleanString(row['Connector ID']),
-        cleanString(row['Type of Connector']),
-        cleanNumber(row['Rated Output Power (kW)']),
-        cleanString(row['Postal Code']),
-        cleanString(row['Block/House No']),
-        cleanString(row['Street Name']),
-        cleanString(row['Building Name']),
-        cleanString(row['Floor No']),
-        cleanString(row['Lot No']),
-        cleanString(row['Is the charger publicly accessible?']),
-        lat,
-        lon,
-        lon,
-        lat
-      ]);
-      
-      imported++;
-      
-      // Progress indicator every 1000 records
-      if (imported % 1000 === 0) {
-        console.log(`   Imported ${imported} / ${data.length} chargers...`);
-      }
-    }
-    
-    console.log(`   ✅ Successfully imported ${imported} EV chargers`);
-    if (skipped > 0) {
-      console.log(`   ⚠️  Skipped ${skipped} records (missing coordinates)`);
-    }
-    
-  } catch (error) {
-    console.error('   ❌ Error importing EV chargers:', error.message);
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-// ============================================
-// 4. Import Resale Transactions (LARGE FILE)
-// ============================================
 async function importResaleTransactions() {
-  console.log('\n🏠 Importing Resale Transactions...');
-  console.log('   ⏳ This may take 5-10 minutes for 217K+ records...');
+  console.log('\n🏠 Importing and Normalizing Resale Transactions...');
+  console.log('   ⏳ This will take several minutes...');
   
   const client = await pool.connect();
   
@@ -289,71 +193,154 @@ async function importResaleTransactions() {
     
     if (!fs.existsSync(dataPath)) {
       console.log('   ⚠️  File not found:', dataPath);
-      console.log('   Looking for file at:', dataPath);
       return;
     }
     
-    console.log('   📖 Reading CSV file...');
+    console.log('   📖 Reading CSV...');
     const data = await readCSV(dataPath);
     console.log(`   Found ${data.length} transactions`);
     
-    // Batch insert for better performance
-    const batchSize = 1000;
+    // Load existing towns lookup
+    console.log('   📊 Loading lookup tables...');
+    const townLookup = {};
+    const townResult = await client.query('SELECT town_id, name FROM town');
+    townResult.rows.forEach(row => {
+      townLookup[row.name.toUpperCase()] = row.town_id;
+    });
+    
+    // Caches for normalization
+    const blockCache = new Map(); // key: "block|street|town_id" -> block_id
+    const flatCache = new Map();  // key: "block_id|flat_type|floor_area|storey|model" -> flat_id
+    
     let imported = 0;
+    let blockCount = 0;
+    let flatCount = 0;
     
     await client.query('BEGIN');
     
-    for (let i = 0; i < data.length; i += batchSize) {
-      const batch = data.slice(i, i + batchSize);
-      
-      const values = [];
-      const placeholders = [];
-      
-      batch.forEach((row, index) => {
-        const offset = index * 11;
-        placeholders.push(
-          `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11})`
-        );
+    for (const row of data) {
+      try {
+        const townName = cleanString(row.town);
+        const townId = townLookup[townName?.toUpperCase()];
         
-        values.push(
-          cleanString(row.month),
-          cleanString(row.town),
-          cleanString(row.flat_type),
-          cleanString(row.block),
-          cleanString(row.street_name),
-          cleanString(row.storey_range),
-          cleanNumber(row.floor_area_sqm),
-          cleanString(row.flat_model),
-          cleanNumber(row.lease_commence_date),
-          cleanString(row.remaining_lease),
-          cleanNumber(row.resale_price)
-        );
-      });
-      
-      const query = `
-        INSERT INTO resale_transaction (
-          month, town, flat_type, block, street_name,
-          storey_range, floor_area_sqm, flat_model,
-          lease_commence_date, remaining_lease, resale_price
-        ) VALUES ${placeholders.join(', ')}
-      `;
-      
-      await client.query(query, values);
-      imported += batch.length;
-      
-      // Progress indicator
-      if (imported % 10000 === 0) {
-        const percentage = ((imported / data.length) * 100).toFixed(1);
-        console.log(`   Imported ${imported} / ${data.length} transactions (${percentage}%)...`);
+        if (!townId) {
+          console.log(`   ⚠️  Unknown town: ${townName}`);
+          continue;
+        }
+        
+        const blockNo = cleanString(row.block);
+        const streetName = cleanString(row.street_name);
+        const blockKey = `${blockNo}|${streetName}|${townId}`;
+        
+        // Get or create HDBBLOCK
+        let blockId = blockCache.get(blockKey);
+        
+        if (!blockId) {
+          const leaseCommenceYear = cleanNumber(row.lease_commence_date);
+          const completionYear = leaseCommenceYear; // Same as lease commencement
+          
+          // Calculate max floor level from storey_range (e.g., "10 TO 12" → 12)
+          let maxFloorLevel = null;
+          const storeyRange = cleanString(row.storey_range);
+          if (storeyRange) {
+            const match = storeyRange.match(/(\d+)\s*TO\s*(\d+)/i);
+            if (match) {
+              maxFloorLevel = parseInt(match[2]);
+            }
+          }
+          
+          const blockResult = await client.query(`
+            INSERT INTO hdbblock (
+              town_id, block_no, street_name, 
+              lease_commence_year, completion_year, max_floor_level
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (block_no, street_name, town_id) 
+            DO UPDATE SET 
+              completion_year = COALESCE(hdbblock.completion_year, EXCLUDED.completion_year),
+              max_floor_level = GREATEST(COALESCE(hdbblock.max_floor_level, 0), COALESCE(EXCLUDED.max_floor_level, 0))
+            RETURNING block_id
+          `, [townId, blockNo, streetName, leaseCommenceYear, completionYear, maxFloorLevel]);
+          
+          blockId = blockResult.rows[0].block_id;
+          blockCache.set(blockKey, blockId);
+          blockCount++;
+        }
+        
+        // Get or create HDBFLAT
+        const flatType = cleanString(row.flat_type);
+        const floorArea = cleanNumber(row.floor_area_sqm);
+        const storeyRange = cleanString(row.storey_range);
+        const flatModel = cleanString(row.flat_model);
+        const remainingLeaseYears = parseRemainingLease(cleanString(row.remaining_lease));
+        
+        const flatKey = `${blockId}|${flatType}|${floorArea}|${storeyRange}|${flatModel}`;
+        let flatId = flatCache.get(flatKey);
+        
+        if (!flatId) {
+          const flatResult = await client.query(`
+            INSERT INTO hdbflat (
+              block_id, flat_type, floor_area_sqm, 
+              storey_range, model, remaining_lease_years
+            ) VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING flat_id
+          `, [blockId, flatType, floorArea, storeyRange, flatModel, remainingLeaseYears]);
+          
+          flatId = flatResult.rows[0].flat_id;
+          flatCache.set(flatKey, flatId);
+          flatCount++;
+        }
+        
+        // Insert RESALE_TRANSACTION
+        const contractDate = parseMonthToDate(cleanString(row.month));
+        const resalePrice = cleanNumber(row.resale_price);
+        const pricePSM = floorArea ? (resalePrice / floorArea) : null;
+        
+        await client.query(`
+          INSERT INTO resale_transaction (
+            flat_id, contract_date, resale_price, 
+            price_psm, remaining_lease_years_at_sale
+          ) VALUES ($1, $2, $3, $4, $5)
+        `, [flatId, contractDate, resalePrice, pricePSM, remainingLeaseYears]);
+        
+        imported++;
+        
+        // Progress indicator
+        if (imported % 10000 === 0) {
+          const pct = ((imported / data.length) * 100).toFixed(1);
+          console.log(`   Progress: ${imported}/${data.length} (${pct}%) | Blocks: ${blockCount} | Flats: ${flatCount}`);
+        }
+        
+      } catch (rowError) {
+        console.error(`   ⚠️  Error processing row ${imported}:`, rowError.message);
       }
     }
     
     await client.query('COMMIT');
-    console.log(`   ✅ Successfully imported ${imported} resale transactions`);
+    
+    console.log(`\n   ✅ Import Complete!`);
+    console.log(`      Transactions: ${imported}`);
+    console.log(`      Unique Blocks: ${blockCount}`);
+    console.log(`      Unique Flats: ${flatCount}`);
+    
+    // Post-processing: Calculate total_dwelling_units per block
+    console.log('\n   🔄 Post-processing: Calculating total dwelling units...');
+    await client.query(`
+      UPDATE hdbblock
+      SET total_dwelling_units = subquery.flat_count
+      FROM (
+        SELECT block_id, COUNT(*) as flat_count
+        FROM hdbflat
+        GROUP BY block_id
+      ) AS subquery
+      WHERE hdbblock.block_id = subquery.block_id
+    `);
+    
+    const dwellingResult = await client.query('SELECT SUM(total_dwelling_units) as total FROM hdbblock');
+    console.log(`      ✅ Updated dwelling units for blocks (Total: ${dwellingResult.rows[0].total})`);
     
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('   ❌ Error importing resale transactions:', error.message);
+    console.error('   ❌ Error:', error.message);
     throw error;
   } finally {
     client.release();
@@ -361,11 +348,26 @@ async function importResaleTransactions() {
 }
 
 // ============================================
-// Main execution
+// 3. CALCULATE PROXIMITIES (Optional - computationally intensive)
 // ============================================
+
+async function calculateProximities() {
+  console.log('\n📏 Calculating Flat-Amenity Proximities...');
+  console.log('   ⚠️  This is computationally intensive and may take 30+ minutes');
+  console.log('   💡 You can skip this and run it separately later');
+  
+  // TODO: Implement proximity calculations using PostGIS distance functions
+  // This would calculate distances from each flat to nearby amenities
+  console.log('   ⏭️  Skipping for now - run separately for production');
+}
+
+// ============================================
+// MAIN EXECUTION
+// ============================================
+
 async function main() {
   console.log('========================================');
-  console.log('🚀 Starting HDB Data Import');
+  console.log('🚀 HDB Smart Analytics - Normalized Import');
   console.log('========================================');
   
   const startTime = Date.now();
@@ -373,14 +375,13 @@ async function main() {
   try {
     // Test database connection
     const testClient = await pool.connect();
-    console.log('✅ Database connection successful');
+    console.log('✅ Database connected');
     testClient.release();
     
-    // Import in order (fastest first for quick feedback)
-    await importMRTStations();        // ~171 records
-    await importSchools();             // ~337 records
-    await importEVChargers();          // ~9,384 records
-    await importResaleTransactions();  // ~217,523 records (slowest)
+    // Import in order
+    await importAmenities();           // ~10K records, ~30 seconds
+    await importResaleTransactions();  // ~217K records, ~5-10 minutes
+    // await calculateProximities();   // Optional, very slow
     
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
@@ -393,17 +394,19 @@ async function main() {
     // Print summary
     const stats = await pool.query(`
       SELECT 
-        (SELECT COUNT(*) FROM mrt_station) as mrt_count,
-        (SELECT COUNT(*) FROM school) as school_count,
-        (SELECT COUNT(*) FROM ev_charger) as ev_count,
-        (SELECT COUNT(*) FROM resale_transaction) as resale_count
+        (SELECT COUNT(*) FROM town) as town_count,
+        (SELECT COUNT(*) FROM hdbblock) as block_count,
+        (SELECT COUNT(*) FROM hdbflat) as flat_count,
+        (SELECT COUNT(*) FROM resale_transaction) as transaction_count,
+        (SELECT COUNT(*) FROM amenity) as amenity_count
     `);
     
     console.log('\n📊 Database Summary:');
-    console.log(`   MRT Stations: ${stats.rows[0].mrt_count}`);
-    console.log(`   Schools: ${stats.rows[0].school_count}`);
-    console.log(`   EV Chargers: ${stats.rows[0].ev_count}`);
-    console.log(`   Resale Transactions: ${stats.rows[0].resale_count}`);
+    console.log(`   Towns: ${stats.rows[0].town_count}`);
+    console.log(`   HDB Blocks: ${stats.rows[0].block_count}`);
+    console.log(`   HDB Flats: ${stats.rows[0].flat_count}`);
+    console.log(`   Transactions: ${stats.rows[0].transaction_count}`);
+    console.log(`   Amenities: ${stats.rows[0].amenity_count}`);
     console.log('\n🎉 Ready to use!');
     
   } catch (error) {
