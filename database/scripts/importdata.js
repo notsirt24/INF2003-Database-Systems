@@ -12,14 +12,13 @@ require('dotenv').config();
 
 // Database connection
 const pool = new Pool({
-  host: process.env.PG_HOST || 'localhost',
-  port: process.env.PG_PORT || 5432,
-  database: process.env.PG_DATABASE || 'hdb_analytics',
-  user: process.env.PG_USER || 'postgres',
-  password: process.env.PG_PASSWORD,
-  max: 20,
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  },
+  max: 10,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000,
 });
 
 // ============================================
