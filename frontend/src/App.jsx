@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
+import CheckDBConnection from './pages/CheckDBConnection'; // ADD THIS
 
 // Import other pages as you create them
 // import Dashboard from './pages/Dashboard';
@@ -18,6 +19,7 @@ function App() {
         <Routes>
           {/* Landing Page */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/check-db" element={<CheckDBConnection />} /> {/* ADD THIS */}
           
           {/* Uncomment these routes as you create the pages */}
           {/* <Route path="/dashboard" element={<Dashboard />} /> */}
