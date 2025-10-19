@@ -2,14 +2,19 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const { MongoClient } = require('mongodb');
+const cookieParser = require('cookie-parser'); // for auth
 require('dotenv').config({ path: '../database/scripts/.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+  credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 // MongoDB connection options
 const mongoOptions = {
@@ -25,6 +30,9 @@ const mongoOptions = {
 // ============================================
 const dashboardRoutes = require('./routes/dashboardRoutes');
 app.use('/api/dashboard', dashboardRoutes);
+
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authRoutes);
 
 // ============================================
 // TEST ENDPOINTS (Optional - for debugging)
@@ -191,5 +199,6 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📊 Dashboard API: http://localhost:${PORT}/api/dashboard`);
+  console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
   console.log(`🔍 Test endpoints available at /api/test-postgres and /api/test-mongodb`);
 });

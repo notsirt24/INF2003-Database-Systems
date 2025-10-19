@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Home, TrendingUp, Map, MessageSquare, Bookmark, Menu, X, Building2, DollarSign, Calendar, MapPin, Filter, RefreshCw, ArrowUpRight, ArrowDownRight, Minus, Book, Cloud } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import Navigation from '../components/Navigation';
 
 // API endpoint for backend queries
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
@@ -272,10 +273,10 @@ export default function HDBDashboard() {
                             })}
                         </div>
 
-                        <div className="hidden md:flex items-center space-x-4">
-                            <button className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300">
-                                Sign In
-                            </button>
+                        <div>
+                            <Navigation />
+                            <div className="pt-28 pb-12 px-6 max-w-7xl mx-auto">
+                            </div>
                         </div>
 
                         <button

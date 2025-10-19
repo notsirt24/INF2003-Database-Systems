@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Home, TrendingUp, Map, MessageSquare, Star, Bookmark, Database, Cpu, Globe, ChevronRight, BarChart3, Building2, School, Zap, Train, Sparkles, Brain, Clock, Shield, Menu, X, Search, User, Cloud, Book } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import Navigation from '../components/Navigation';
 
 export default function HDBLandingPage() {
   const [scrollY, setScrollY] = useState(0);
@@ -146,11 +148,11 @@ export default function HDBLandingPage() {
               })}
             </div>
 
-            {/* Auth Buttons */}
-            <div className="hidden md:flex items-center space-x-4">
-              <button className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300">
-                Sign In
-              </button>
+            <div className="min-h-screen bg-white">
+                <Navigation />
+                
+                <div className="relative min-h-screen flex items-center...">
+                </div>
             </div>
 
             {/* Mobile Menu Button */}
@@ -181,12 +183,18 @@ export default function HDBLandingPage() {
                 );
               })}
               <div className="pt-4 space-y-2">
-                <button className="w-full px-4 py-3 text-gray-700 hover:text-blue-600 font-medium text-left rounded-lg hover:bg-gray-100">
+                <Link 
+                  to="/login"
+                  className="block w-full px-4 py-3 text-gray-700 hover:text-blue-600 font-medium text-left rounded-lg hover:bg-gray-100"
+                >
                   Sign In
-                </button>
-                <button className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-medium">
+                </Link>
+                <Link 
+                  to="/signup"
+                  className="block w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-medium text-center"
+                >
                   Get Started
-                </button>
+                </Link>
               </div>
             </div>
           </div>
