@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 
 // Import other pages as you create them
-// import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/Dashboard';
 // import MapView from './pages/MapView';
 // import Login from './pages/Login';
 // import Register from './pages/Register';
@@ -20,7 +20,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           
           {/* Uncomment these routes as you create the pages */}
-          {/* <Route path="/dashboard" element={<Dashboard />} /> */}
+          <Route path="/dashboard" element={<Dashboard />} />
           {/* <Route path="/map" element={<MapView />} /> */}
           {/* <Route path="/login" element={<Login />} /> */}
           {/* <Route path="/register" element={<Register />} /> */}
