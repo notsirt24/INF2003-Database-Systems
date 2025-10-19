@@ -48,16 +48,22 @@ export default function HDBDashboard() {
         fetchTowns();
     }, []);
 
-    useEffect(() => {
-        fetchDashboardData();
-    }, [selectedTown, selectedYear, dateRange]);
-
     // Add effect to refetch town comparison when comparison towns change
     useEffect(() => {
         if (selectedTown !== 'All' && comparisonTowns.length > 0) {
             fetchTownComparison();
         }
-    }, [comparisonTowns]);
+    }, [comparisonTowns, selectedYear, dateRange]); // Add selectedYear and dateRange as dependencies
+
+    // Fetch town comparison whenever comparisonTowns, year, or range changes
+    useEffect(() => {
+        fetchTownComparison();
+    }, [comparisonTowns, selectedYear, dateRange]);
+
+    // Main dashboard data (excluding town comparison)
+    useEffect(() => {
+        fetchDashboardData();
+    }, [selectedTown, selectedYear, dateRange]);
 
     const fetchTowns = async () => {
         try {
@@ -74,7 +80,6 @@ export default function HDBDashboard() {
         try {
             await Promise.all([
                 fetchPriceTrends(),
-                fetchTownComparison(),
                 fetchFlatTypeDistribution(),
                 fetchTransactionVolume(),
                 fetchKeyMetrics(),

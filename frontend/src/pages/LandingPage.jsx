@@ -26,6 +26,7 @@ export default function HDBLandingPage() {
     { name: 'AI-Chatbot', icon: Cloud, path: '/chatbot' },
     { name: 'Watchlist', icon: Bookmark, path: '/watchlist' },
     { name: 'Reviews', icon: Book, path: '/reviews' },
+    { name: 'Check DB', icon: Database, path: '/check-db' }, // To remove after
   ];
 
   const stats = [
