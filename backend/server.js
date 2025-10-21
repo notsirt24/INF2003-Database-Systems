@@ -34,6 +34,14 @@ app.use('/api/dashboard', dashboardRoutes);
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
+// Listings (resale transactions)
+const listingRoutes = require('./routes/listingRoutes');
+app.use('/api/listings', listingRoutes);
+
+// Watchlist routes (secure)
+const watchlistRoutes = require('./routes/watchlistRoutes');
+app.use('/api', watchlistRoutes);
+
 // ============================================
 // TEST ENDPOINTS (Optional - for debugging)
 // ============================================

@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import Watchlist from './pages/WatchList';
 // import MapView from './pages/MapView';
 // import Login from './pages/Login';
 // import Register from './pages/Register';
@@ -35,7 +36,7 @@ function App() {
           {/* <Route path="/login" element={<Login />} /> */}
           {/* <Route path="/register" element={<Register />} /> */}
           {/* <Route path="/property/:id" element={<PropertyDetails />} /> */}
-          {/* <Route path="/watchlist" element={<Watchlist />} /> */}
+          <Route path="/watchlist" element={ <ProtectedRoute> <Watchlist /> </ProtectedRoute> } />
           {/* <Route path="/profile" element={<Profile />} /> */}
           
           {/* 404 Not Found */}
