@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, LayerGroup, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import Navigation from '../components/Navigation';
@@ -55,6 +55,19 @@ const getIconSVG = (type) => {
   }
 };
 
+// Component to handle map view updates
+const MapViewController = ({ center, zoom }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (center && zoom) {
+      map.setView(center, zoom, { animate: true });
+    }
+  }, [center, zoom, map]);
+  
+  return null;
+};
+
 const InteractiveMap = () => {
   const [mrtStations, setMrtStations] = useState([]);
   const [schools, setSchools] = useState([]);
@@ -68,6 +81,23 @@ const InteractiveMap = () => {
     busStops: false,
     evCharging: false
   });
+  
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [schoolFilter, setSchoolFilter] = useState('all'); // all, primary, secondary, jc
+  const [mapCenter, setMapCenter] = useState([1.3521, 103.8198]);
+  const [mapZoom, setMapZoom] = useState(12);
+  const [selectedLocation, setSelectedLocation] = useState(null); // For clicked search results
+
+  // Route planning state
+  const [routeStart, setRouteStart] = useState(null); // {type, name, latitude, longitude, subtitle}
+  const [routeEnd, setRouteEnd] = useState(null);   // same shape as start
+  const [routePolyline, setRoutePolyline] = useState([]); // [[lat,lng], [lat,lng]]
+  const [routeDistanceMeters, setRouteDistanceMeters] = useState(null);
+  const [routeEtaMinutes, setRouteEtaMinutes] = useState(null);
+  const [nearestTransit, setNearestTransit] = useState({ mrt: null, bus: null });
 
   // Singapore center coordinates
   const singaporeCenter = [1.3521, 103.8198];
@@ -95,6 +125,10 @@ const InteractiveMap = () => {
 
       if (schoolsRes.ok) {
         const schoolsData = await schoolsRes.json();
+        // Log first school to see the data structure
+        if (schoolsData.length > 0) {
+          console.log('Sample school data:', schoolsData[0]);
+        }
         setSchools(schoolsData);
       }
 
@@ -123,6 +157,208 @@ const InteractiveMap = () => {
     }));
   };
 
+  // Haversine distance in meters
+  const haversine = (lat1, lon1, lat2, lon2) => {
+    const toRad = (deg) => deg * Math.PI / 180;
+    const R = 6371000; // meters
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Build/update route when start and end are set
+  useEffect(() => {
+    if (routeStart && routeEnd) {
+      const poly = [
+        [routeStart.latitude, routeStart.longitude],
+        [routeEnd.latitude, routeEnd.longitude]
+      ];
+      setRoutePolyline(poly);
+
+      const dist = haversine(
+        routeStart.latitude,
+        routeStart.longitude,
+        routeEnd.latitude,
+        routeEnd.longitude
+      );
+      setRouteDistanceMeters(Math.round(dist));
+      // walking speed ~ 5 km/h => 83.33 m/min
+      setRouteEtaMinutes(Math.max(1, Math.round(dist / 83.33)));
+
+      // Center roughly between start and end
+      const midLat = (routeStart.latitude + routeEnd.latitude) / 2;
+      const midLng = (routeStart.longitude + routeEnd.longitude) / 2;
+      setMapCenter([midLat, midLng]);
+      setMapZoom(13);
+    } else {
+      setRoutePolyline([]);
+      setRouteDistanceMeters(null);
+      setRouteEtaMinutes(null);
+      setNearestTransit({ mrt: null, bus: null });
+    }
+  }, [routeStart, routeEnd]);
+
+  // Search functionality
+  useEffect(() => {
+    if (searchQuery.trim() === '') {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const results = [];
+
+    // Search MRT stations
+    mrtStations.forEach(station => {
+      if (station.stn_name?.toLowerCase().includes(query) || 
+          station.stn_no?.toLowerCase().includes(query)) {
+        results.push({
+          ...station,
+          type: 'MRT Station',
+          displayName: station.stn_name,
+          subtitle: `Station Code: ${station.stn_no}`,
+          color: 'red'
+        });
+      }
+    });
+
+    // Search schools
+    schools.forEach(school => {
+      if (school.school_name?.toLowerCase().includes(query)) {
+        results.push({
+          ...school,
+          type: 'School',
+          displayName: school.school_name,
+          subtitle: school.mainlevel_code || 'School',
+          color: 'green'
+        });
+      }
+    });
+
+    // Search bus stops
+    busStops.forEach(bus => {
+      if (bus.description?.toLowerCase().includes(query) || 
+          bus.bus_stop_code?.includes(query)) {
+        results.push({
+          ...bus,
+          type: 'Bus Stop',
+          displayName: bus.description,
+          subtitle: `Code: ${bus.bus_stop_code}`,
+          color: 'blue'
+        });
+      }
+    });
+
+    // Search EV charging
+    evChargingSpots.forEach(ev => {
+      if (ev.name?.toLowerCase().includes(query) || 
+          ev.building_name?.toLowerCase().includes(query)) {
+        results.push({
+          ...ev,
+          type: 'EV Charging',
+          displayName: ev.name,
+          subtitle: ev.building_name || 'EV Charging Station',
+          color: 'yellow'
+        });
+      }
+    });
+
+    setSearchResults(results.slice(0, 10)); // Limit to 10 results
+    setShowSearchResults(true);
+  }, [searchQuery, mrtStations, schools, busStops, evChargingSpots]);
+
+  // Handle search result click
+  const handleSearchResultClick = (result) => {
+    console.log('Search result clicked:', result);
+    if (result.latitude && result.longitude) {
+      const newCenter = [result.latitude, result.longitude];
+      console.log('Setting map center to:', newCenter);
+      setMapCenter(newCenter);
+      setMapZoom(17);
+      setSelectedLocation(result); // Set the selected location to show its popup
+      setSearchQuery('');
+      setShowSearchResults(false);
+    }
+  };
+
+  // Helpers to set route points from an entity
+  const buildLocationFromEntity = (type, entity) => {
+    switch (type) {
+      case 'MRT Station':
+        return {
+          type,
+          name: entity.stn_name || entity.displayName,
+          latitude: entity.latitude,
+          longitude: entity.longitude,
+          subtitle: entity.stn_no || entity.line_code || ''
+        };
+      case 'School':
+        return {
+          type,
+          name: entity.school_name || entity.displayName,
+          latitude: entity.latitude,
+          longitude: entity.longitude,
+          subtitle: entity.address || ''
+        };
+      case 'Bus Stop':
+        return {
+          type,
+          name: entity.description || entity.displayName,
+          latitude: entity.latitude,
+          longitude: entity.longitude,
+          subtitle: entity.bus_stop_code || entity.road_name || ''
+        };
+      case 'EV Charging':
+        return {
+          type,
+          name: entity.name || entity.displayName,
+          latitude: entity.latitude,
+          longitude: entity.longitude,
+          subtitle: entity.building_name || ''
+        };
+      default:
+        return null;
+    }
+  };
+
+  // Nearest transit fetchers
+  const findNearest = async (from, kind) => {
+    if (!from) return;
+    try {
+      const typeMap = { mrt: 'mrt', bus: 'bus' };
+      const type = typeMap[kind];
+      const url = `/api/map/nearby?lat=${from.latitude}&lng=${from.longitude}&type=${encodeURIComponent(type)}&radius=1500`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Failed to fetch nearest');
+      const data = await res.json();
+      const best = data && data.length ? data[0] : null;
+      setNearestTransit(prev => ({ ...prev, [kind]: best }));
+    } catch (e) {
+      console.error('Nearest fetch failed', e);
+    }
+  };
+
+  // Filter data based on filters
+  const getFilteredSchools = () => {
+    if (schoolFilter === 'all') return schools;
+    
+    const filtered = schools.filter(school => {
+      const level = school.mainlevel_code?.toUpperCase() || '';
+      if (schoolFilter === 'primary') return level === 'PRIMARY';
+      if (schoolFilter === 'secondary') return level === 'SECONDARY';
+      if (schoolFilter === 'jc') return level === 'JUNIOR COLLEGE' || level === 'PRE-UNIVERSITY';
+      return true;
+    });
+    
+    console.log(`Filtering schools by ${schoolFilter}: ${filtered.length} of ${schools.length}`);
+    return filtered;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -145,6 +381,216 @@ const InteractiveMap = () => {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Interactive Location Map</h1>
           <p className="text-gray-600">Explore MRT stations, schools, bus stops, and EV charging locations across Singapore</p>
+        </div>
+
+        {/* Route Planner */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <span>🧭</span> Route Planner
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="p-3 rounded border border-gray-200">
+              <div className="text-xs text-gray-500 mb-1">Start</div>
+              <div className="text-sm text-gray-800">
+                {routeStart ? (
+                  <>
+                    <span className="font-medium">{routeStart.name}</span>
+                    {routeStart.subtitle && <span className="text-gray-500"> — {routeStart.subtitle}</span>}
+                  </>
+                ) : 'Select any marker and click “Set as Start”'}
+              </div>
+            </div>
+            <div className="p-3 rounded border border-gray-200">
+              <div className="text-xs text-gray-500 mb-1">Destination</div>
+              <div className="text-sm text-gray-800">
+                {routeEnd ? (
+                  <>
+                    <span className="font-medium">{routeEnd.name}</span>
+                    {routeEnd.subtitle && <span className="text-gray-500"> — {routeEnd.subtitle}</span>}
+                  </>
+                ) : 'Select any marker and click “Set as Destination”'}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2 items-center">
+            <button
+              onClick={() => { setRouteStart(null); setRouteEnd(null); setSelectedLocation(null); setRoutePolyline([]); setMapCenter([1.3521, 103.8198]); setMapZoom(12); setNearestTransit({mrt:null,bus:null}); }}
+              className="px-4 py-2 rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+            >
+              Clear Route
+            </button>
+            <button
+              onClick={() => { if (routeStart && routeEnd) { const s=routeStart; setRouteStart(routeEnd); setRouteEnd(s);} }}
+              disabled={!routeStart || !routeEnd}
+              className={`px-4 py-2 rounded ${routeStart && routeEnd ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+            >
+              Swap Start/Destination
+            </button>
+            {routeStart && !routeEnd && (
+              <>
+                <button
+                  onClick={() => findNearest(routeStart, 'mrt')}
+                  className="px-4 py-2 rounded bg-red-100 text-red-700 hover:bg-red-200"
+                >
+                  Find nearest MRT
+                </button>
+                <button
+                  onClick={() => findNearest(routeStart, 'bus')}
+                  className="px-4 py-2 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                >
+                  Find nearest Bus Stop
+                </button>
+              </>
+            )}
+          </div>
+
+          {(routeDistanceMeters || nearestTransit.mrt || nearestTransit.bus) && (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              {routeDistanceMeters && (
+                <div className="p-3 rounded border border-purple-200 bg-purple-50">
+                  <div className="text-xs text-purple-700">Distance</div>
+                  <div className="text-lg font-semibold text-purple-800">{(routeDistanceMeters/1000).toFixed(2)} km</div>
+                  <div className="text-xs text-purple-700">Walking ~ {routeEtaMinutes} min</div>
+                </div>
+              )}
+              {nearestTransit.mrt && (
+                <div className="p-3 rounded border border-red-200 bg-red-50">
+                  <div className="text-xs text-red-700">Nearest MRT</div>
+                  <div className="text-sm font-medium text-red-800">{nearestTransit.mrt.stn_name}</div>
+                  <button
+                    onClick={() => setRouteEnd(buildLocationFromEntity('MRT Station', nearestTransit.mrt))}
+                    className="mt-2 px-3 py-1.5 text-xs rounded bg-red-600 text-white hover:bg-red-700"
+                  >
+                    Set as Destination
+                  </button>
+                </div>
+              )}
+              {nearestTransit.bus && (
+                <div className="p-3 rounded border border-blue-200 bg-blue-50">
+                  <div className="text-xs text-blue-700">Nearest Bus Stop</div>
+                  <div className="text-sm font-medium text-blue-800">{nearestTransit.bus.description || 'Bus Stop'} ({nearestTransit.bus.bus_stop_code})</div>
+                  <button
+                    onClick={() => setRouteEnd(buildLocationFromEntity('Bus Stop', nearestTransit.bus))}
+                    className="mt-2 px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                  >
+                    Set as Destination
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Search Bar and Reset Button */}
+        <div className="mb-4 flex gap-3">
+          <div className="flex-1 relative">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search for MRT stations, schools, bus stops, or EV charging stations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <MapPin className="absolute left-4 top-3.5 w-5 h-5 text-gray-400" />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowSearchResults(false);
+                  }}
+                  className="absolute right-4 top-3.5 text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {/* Reset View Button */}
+          <button
+            onClick={() => {
+              setMapCenter([1.3521, 103.8198]);
+              setMapZoom(12);
+              setSelectedLocation(null);
+              setSchoolFilter('all');
+              // Clear any active route
+              setRouteStart(null);
+              setRouteEnd(null);
+              setRoutePolyline([]);
+              setRouteDistanceMeters(null);
+              setRouteEtaMinutes(null);
+              setNearestTransit({ mrt: null, bus: null });
+            }}
+            disabled={!selectedLocation && schoolFilter === 'all'}
+            className={`px-6 py-3 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap ${
+              selectedLocation || schoolFilter !== 'all'
+                ? 'bg-purple-600 hover:bg-purple-700 text-white cursor-pointer'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            <span>↻</span> Reset View
+          </button>
+        </div>
+        
+        <div className="relative">
+
+          {/* Search Results Dropdown */}
+          {showSearchResults && searchResults.length > 0 && (
+            <div className="absolute z-50 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+              {searchResults.map((result, index) => (
+                <div
+                  key={index}
+                  onClick={() => handleSearchResultClick(result)}
+                  className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-block w-3 h-3 rounded-full bg-${result.color}-500`}></span>
+                        <p className="font-semibold text-gray-800">{result.displayName}</p>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{result.subtitle}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        <span className={`px-2 py-0.5 bg-${result.color}-100 text-${result.color}-700 rounded text-xs font-medium`}>
+                          {result.type}
+                        </span>
+                      </p>
+                    </div>
+                    <MapPin className="w-4 h-4 text-gray-400 mt-1" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showSearchResults && searchResults.length === 0 && searchQuery && (
+            <div className="absolute z-50 w-full mt-2 bg-white border border-gray-300 rounded-lg shadow-lg p-4">
+              <p className="text-gray-500 text-center">No results found for "{searchQuery}"</p>
+            </div>
+          )}
+        </div>
+
+        {/* Filter Section */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <span>🔍</span> Filters
+          </h3>
+          {/* School Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">School Level</label>
+            <select
+              value={schoolFilter}
+              onChange={(e) => setSchoolFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            >
+              <option value="all">All Schools</option>
+              <option value="primary">Primary Schools</option>
+              <option value="secondary">Secondary Schools</option>
+              <option value="jc">Junior Colleges</option>
+            </select>
+          </div>
         </div>
 
         {error && (
@@ -215,6 +661,7 @@ const InteractiveMap = () => {
             style={{ height: '100%', width: '100%' }}
             scrollWheelZoom={true}
           >
+            <MapViewController center={mapCenter} zoom={mapZoom} />
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -237,13 +684,27 @@ const InteractiveMap = () => {
                     <p className="text-xs text-gray-500 mt-1">
                       {station.latitude.toFixed(6)}, {station.longitude.toFixed(6)}
                     </p>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => setRouteStart(buildLocationFromEntity('MRT Station', station))}
+                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                      >
+                        Set as Start
+                      </button>
+                      <button
+                        onClick={() => setRouteEnd(buildLocationFromEntity('MRT Station', station))}
+                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                      >
+                        Set as Destination
+                      </button>
+                    </div>
                   </div>
                 </Popup>
               </Marker>
             ))}
 
             {/* Schools Layer */}
-            {selectedLayers.schools && schools.map((school, idx) => (
+            {selectedLayers.schools && getFilteredSchools().map((school, idx) => (
               school.latitude && school.longitude && (
                 <Marker 
                   key={`school-${idx}`}
@@ -266,6 +727,20 @@ const InteractiveMap = () => {
                       {school.zone_code && (
                         <p className="text-xs text-gray-500">Zone: {school.zone_code}</p>
                       )}
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => setRouteStart(buildLocationFromEntity('School', school))}
+                          className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                        >
+                          Set as Start
+                        </button>
+                        <button
+                          onClick={() => setRouteEnd(buildLocationFromEntity('School', school))}
+                          className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        >
+                          Set as Destination
+                        </button>
+                      </div>
                     </div>
                   </Popup>
                 </Marker>
@@ -294,6 +769,20 @@ const InteractiveMap = () => {
                     <p className="text-xs text-gray-400 mt-1">
                       {busStop.latitude.toFixed(6)}, {busStop.longitude.toFixed(6)}
                     </p>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => setRouteStart(buildLocationFromEntity('Bus Stop', busStop))}
+                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                      >
+                        Set as Start
+                      </button>
+                      <button
+                        onClick={() => setRouteEnd(buildLocationFromEntity('Bus Stop', busStop))}
+                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                      >
+                        Set as Destination
+                      </button>
+                    </div>
                   </div>
                 </Popup>
               </Marker>
@@ -340,11 +829,108 @@ const InteractiveMap = () => {
                       {evSpot.is_public && (
                         <p className="text-xs text-green-600 mt-1">✓ Publicly accessible</p>
                       )}
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          onClick={() => setRouteStart(buildLocationFromEntity('EV Charging', evSpot))}
+                          className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                        >
+                          Set as Start
+                        </button>
+                        <button
+                          onClick={() => setRouteEnd(buildLocationFromEntity('EV Charging', evSpot))}
+                          className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        >
+                          Set as Destination
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </Popup>
               </Marker>
             ))}
+
+            {/* Route polyline */}
+            {routePolyline.length === 2 && (
+              <Polyline
+                positions={routePolyline}
+                pathOptions={{ color: '#7C3AED', weight: 4, opacity: 0.85 }}
+              />
+            )}
+
+            {/* Selected Location Marker (from search results) */}
+            {selectedLocation && selectedLocation.latitude && selectedLocation.longitude && (
+              <Marker
+                position={[selectedLocation.latitude, selectedLocation.longitude]}
+                icon={createCustomIcon(
+                  selectedLocation.type === 'MRT Station' ? '#DC2626' :
+                  selectedLocation.type === 'School' ? '#16A34A' :
+                  selectedLocation.type === 'Bus Stop' ? '#2563EB' : '#EAB308',
+                  selectedLocation.type === 'MRT Station' ? 'train' :
+                  selectedLocation.type === 'School' ? 'school' :
+                  selectedLocation.type === 'Bus Stop' ? 'bus' : 'zap'
+                )}
+                eventHandlers={{
+                  popupclose: () => setSelectedLocation(null)
+                }}
+              >
+                <Popup autoOpen={true}>
+                  <div className="p-2 max-w-xs">
+                    <h3 className="font-bold text-lg mb-1 flex items-center gap-2">
+                      {selectedLocation.type === 'MRT Station' && <Train className="w-5 h-5 text-red-600" />}
+                      {selectedLocation.type === 'School' && <School className="w-5 h-5 text-green-600" />}
+                      {selectedLocation.type === 'Bus Stop' && <Bus className="w-5 h-5 text-blue-600" />}
+                      {selectedLocation.type === 'EV Charging' && <Zap className="w-5 h-5 text-yellow-600" />}
+                      {selectedLocation.displayName}
+                    </h3>
+                    <p className="text-sm text-gray-700 mb-1">{selectedLocation.subtitle}</p>
+                    
+                    {/* MRT specific details */}
+                    {selectedLocation.type === 'MRT Station' && selectedLocation.line_code && (
+                      <p className="text-xs text-gray-600">Line: {selectedLocation.line_code}</p>
+                    )}
+                    
+                    {/* School specific details */}
+                    {selectedLocation.type === 'School' && (
+                      <>
+                        {selectedLocation.address && <p className="text-sm text-gray-700 mb-1">{selectedLocation.address}</p>}
+                        {selectedLocation.postal_code && <p className="text-sm text-gray-600">Postal: {selectedLocation.postal_code}</p>}
+                        {selectedLocation.mainlevel_code && <p className="text-xs text-gray-600">Level: {selectedLocation.mainlevel_code}</p>}
+                      </>
+                    )}
+                    
+                    {/* Bus Stop specific details */}
+                    {selectedLocation.type === 'Bus Stop' && (
+                      <>
+                        {selectedLocation.bus_stop_code && <p className="text-sm text-gray-600">Code: {selectedLocation.bus_stop_code}</p>}
+                        {selectedLocation.road_name && <p className="text-sm text-gray-600">Road: {selectedLocation.road_name}</p>}
+                      </>
+                    )}
+                    
+                    {/* EV Charging specific details */}
+                    {selectedLocation.type === 'EV Charging' && (
+                      <>
+                        {selectedLocation.building_name && <p className="text-sm text-gray-700 mb-1">{selectedLocation.building_name}</p>}
+                        {selectedLocation.connector_types && <p className="text-xs text-gray-500 mt-1">Type: {selectedLocation.connector_types}</p>}
+                      </>
+                    )}
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => setRouteStart(buildLocationFromEntity(selectedLocation.type, selectedLocation))}
+                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                      >
+                        Set as Start
+                      </button>
+                      <button
+                        onClick={() => setRouteEnd(buildLocationFromEntity(selectedLocation.type, selectedLocation))}
+                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                      >
+                        Set as Destination
+                      </button>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
           </MapContainer>
         </div>
 

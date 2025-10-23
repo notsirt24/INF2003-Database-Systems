@@ -46,7 +46,7 @@ router.get('/schools', async (req, res) => {
   }
 });
 
-// GET /api/map/bus-stops - Get all bus stops (limited to 300 for performance)
+// GET /api/map/bus-stops - Get all bus stops (limited for performance)
 router.get('/bus-stops', async (req, res) => {
   let client;
   try {
@@ -54,8 +54,7 @@ router.get('/bus-stops', async (req, res) => {
     await client.connect();
     const db = client.db(dbName);
     
-    // Limit to 300 for performance
-    const busStops = await db.collection('bus_stops').find({}).limit(300).toArray();
+    const busStops = await db.collection('bus_stops').find({}).toArray();
     res.json(busStops);
   } catch (error) {
     console.error('Error fetching bus stops:', error);
@@ -74,12 +73,43 @@ router.get('/ev-charging', async (req, res) => {
     client = new MongoClient(mongoUri);
     await client.connect();
     const db = client.db(dbName);
-    
-    const evCharging = await db.collection('ev_charging_stations').find({}).toArray();
+    const { limit } = req.query;
+    let cursor = db.collection('ev_charging_stations').find({});
+    if (limit) {
+      const n = parseInt(limit);
+      if (!Number.isNaN(n) && n > 0) cursor = cursor.limit(n);
+    }
+    const evCharging = await cursor.toArray();
     res.json(evCharging);
   } catch (error) {
     console.error('Error fetching EV charging stations:', error);
     res.status(500).json({ error: 'Failed to fetch EV charging stations', details: error.message });
+  } finally {
+    if (client) {
+      await client.close();
+    }
+  }
+});
+
+// GET /api/map/ev-charging/stats - Get EV charging counts (total and unique by location)
+router.get('/ev-charging/stats', async (req, res) => {
+  let client;
+  try {
+    client = new MongoClient(mongoUri);
+    await client.connect();
+    const db = client.db(dbName);
+
+    const total = await db.collection('ev_charging_stations').countDocuments({});
+    const uniqueAgg = await db.collection('ev_charging_stations').aggregate([
+      { $group: { _id: { lat: "$latitude", lng: "$longitude" }, count: { $sum: 1 } } },
+      { $group: { _id: null, unique: { $sum: 1 } } }
+    ]).toArray();
+    const uniqueByLocation = uniqueAgg[0]?.unique || 0;
+
+    res.json({ total, uniqueByLocation });
+  } catch (error) {
+    console.error('Error fetching EV charging stats:', error);
+    res.status(500).json({ error: 'Failed to fetch EV charging stats', details: error.message });
   } finally {
     if (client) {
       await client.close();
