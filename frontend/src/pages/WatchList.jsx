@@ -4,60 +4,111 @@ import Navigation from '../components/Navigation';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
-function ListingCard({ property }) {
-  const { flat_id, town, block, street_name, flat_type, resale_price, floor_area_sqm, remaining_lease_years_at_sale, postal_code } = property;
+function ListingCard({ property, onAddToWatchlist, onRemoveFromWatchlist, actionLoading, mode = 'explore', isSaved = false }) {
+  const { town, block, street_name, flat_type, resale_price, floor_area_sqm, remaining_lease_years_at_sale, block_min_price, block_max_price, merged_count } = property;
+  const canAdd = typeof onAddToWatchlist === 'function';
+  const canRemove = typeof onRemoveFromWatchlist === 'function';
+  if (canAdd && canRemove) {
+    // unexpected: both handlers provided — prefer remove button in this case
+    console.debug('[ListingCard] both onAdd and onRemove provided for flat_id:', property && property.flat_id);
+  }
 
-  const displayPrice = resale_price ? `S$ ${Number(resale_price).toLocaleString()}` : 'Price n/a';
+  // Show block-level min/max range only when we have merged multiple transactions for the address.
+  let displayPrice = 'Price n/a';
+  if (mode === 'explore' && merged_count > 1 && block_min_price != null && block_max_price != null) {
+    displayPrice = `S$ ${Number(block_min_price).toLocaleString()} - S$ ${Number(block_max_price).toLocaleString()}`;
+  } else if (resale_price) {
+    displayPrice = `S$ ${Number(resale_price).toLocaleString()}`;
+  }
   const title = street_name ? `${block} ${street_name}` : `${block}`;
-  const subtitle = postal_code ? `${postal_code}` : town || '';
 
   return (
-    <div className="bg-white border-2 border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition">
-      <div className="flex">
-        <div className="w-40 h-28 bg-gray-100 flex-shrink-0">
-          {/* Placeholder image (replace with real image URL if available) */}
-          <img
-            src="https://images.unsplash.com/photo-1560184897-6b2a4f0c2fa5?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=placeholder"
-            alt={title}
-            className="w-full h-full object-cover"
-          />
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition flex flex-col">
+      <div className="w-full h-48 bg-gray-100 relative">
+        {/* Listing cover image served from public folder */}
+        <img
+          src={(process.env.PUBLIC_URL || '') + '/images/listing_cover_image.jpg'}
+          alt={title}
+          className="w-full h-full object-cover"
+          onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1560184897-6b2a4f0c2fa5?q=80&w=800&auto=format&fit=crop&ixlib=rb-4.0.3&s=placeholder'; }}
+        />
+        {merged_count && merged_count > 1 && (
+          <div
+            className="absolute top-2 right-2 bg-blue-600 px-2 py-1 rounded-full text-xs font-semibold text-white shadow-lg z-10"
+            title={`${merged_count} transactions`}
+            aria-label={`${merged_count} transactions`}
+          >
+            {merged_count} transactions
+          </div>
+        )}
+      </div>
+
+      <div className="p-4 flex flex-col flex-1">
+        <div className="flex-1">
+          <div className="mb-3">
+            <div className="text-sm text-gray-900 mb-1">{town || '-'} • {flat_type || '-'}</div>
+            <div className="text-lg font-bold text-gray-900 mb-1">{title}</div>
+            {/* merged_count badge handled in image area; no inline debug text */}
+            <div className="text-lg font-extrabold text-gray-900">{displayPrice}</div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-gray-500 text-sm">
+            <div className="inline-flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md">
+              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M3 21h18M5 21V8l7-5 7 5v13" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 12h4v9h-4z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="truncate">{flat_type || '-'}</span>
+            </div>
+            <div className="inline-flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md">
+              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M4 4h16v16H4z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4 4l16 16M20 4L4 20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="truncate">{floor_area_sqm ? `${Math.round(floor_area_sqm)} m²` : '0 m²'}</span>
+            </div>
+            <div className="inline-flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md">
+              <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="9" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 7v5l3 3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="truncate">{remaining_lease_years_at_sale ? `${Math.round(remaining_lease_years_at_sale)} yrs` : '-'}</span>
+            </div>
+          </div>
         </div>
 
-        <div className="p-4 flex-1">
-          <div className="flex items-start justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">{title}</h3>
-              <p className="text-sm text-gray-500">{subtitle} • {flat_type || 'N/A'}</p>
-            </div>
-            <div className="text-right">
-              <div className="text-lg font-extrabold text-gray-900">{displayPrice}</div>
-              <div className="text-xs text-gray-500">Flat ID: {flat_id}</div>
-            </div>
-          </div>
-
-            {floor_area_sqm && <p className="mt-2 text-sm text-gray-600">{Math.round(floor_area_sqm)} sqm • {remaining_lease_years_at_sale ? Math.round(remaining_lease_years_at_sale) + ' yrs remaining' : ''}</p>}
-
-
-          <div className="mt-3 flex items-center justify-between">
-            <div className="flex items-center space-x-4 text-gray-500 text-sm">
-              <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h18M3 12h18M3 17h18" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                <span>{flat_type || '-'}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 10h18M3 14h18" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                <span>{Math.round(floor_area_sqm || 0)} sqm</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                <span>{remaining_lease_years_at_sale ? Math.round(remaining_lease_years_at_sale) + ' yrs' : '-'}</span>
-              </div>
-            </div>
-
-            <div>
-              <button className="px-3 py-1 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg text-sm">View</button>
-            </div>
-          </div>
+        <div className="pt-4 flex justify-end">
+          {mode === 'my' && canRemove ? (
+            <button
+              onClick={() => onRemoveFromWatchlist(property.flat_id)}
+              disabled={actionLoading}
+              className="p-2 text-red-500 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-50"
+              title="Remove from Watchlist"
+            >
+              <svg className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M6 18L18 6M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          ) : (mode === 'explore' && canAdd) ? (
+            // In explore mode show a bookmark toggle: add when not saved, remove when saved
+            <button
+              onClick={() => isSaved ? (typeof onRemoveFromWatchlist === 'function' ? onRemoveFromWatchlist(property.flat_id) : null) : onAddToWatchlist(property)}
+              disabled={actionLoading}
+              className={`p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isSaved ? 'hover:bg-yellow-50' : 'text-gray-400 hover:text-green-600'}`}
+              title={isSaved ? 'Remove from Watchlist' : 'Add to Watchlist'}
+              aria-pressed={isSaved}
+            >
+              {isSaved ? (
+                <svg className="w-7 h-7 text-yellow-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M6 2c-.55 0-1 .45-1 1v18l7-4 7 4V3c0-.55-.45-1-1-1H6z" />
+                </svg>
+              ) : (
+                <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>
@@ -73,17 +124,29 @@ export default function WatchList() {
   const [mode, setMode] = useState('my'); // 'my' or 'explore'
   const [listings, setListings] = useState([]);
   const [actionLoading, setActionLoading] = useState(false);
-  // simple toast state
-  const [toasts, setToasts] = useState([]);
+  // no toast UI — use console logs / alerts for feedback
 
-  const pushToast = (message, type = 'info', ttl = 3500) => {
-    const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, message, type }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
-  };
-
+  // Fetch listings once on mount (explore data)
   useEffect(() => {
-    const fetchWatchlist = async () => {
+    (async () => {
+      try {
+        const resp = await fetch(`${API_URL}/listings?limit=30`);
+        if (!resp.ok) throw new Error(`Failed to load listings (${resp.status})`);
+        const json = await resp.json();
+        const fetched = json.listings || [];
+        setListings(fetched);
+      } catch (e) {
+        console.error('Listing fetch error:', e);
+        setListings([]);
+      }
+    })();
+  }, []);
+
+  // Fetch watchlist whenever the user switches to 'my' mode
+  useEffect(() => {
+    if (mode !== 'my') return;
+
+    (async () => {
       setLoading(true);
       setError(null);
 
@@ -93,13 +156,11 @@ export default function WatchList() {
       if (!userRaw) {
         setError('Not signed in. Please sign in to see your watchlist.');
         setLoading(false);
+        setProperties([]);
         return;
       }
 
-  // user info available in localStorage but not required client-side for fetching
-
       try {
-        // Call secure endpoint that returns only the authenticated user's watchlist
         const res = await fetch(`${API_URL}/watchlist`, {
           headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
@@ -110,39 +171,31 @@ export default function WatchList() {
         }
 
         const data = await res.json();
-        // Expect { success: true, watchlist: { user_id, properties: [...] } }
+        // debug server response
+        try { console.debug('[WatchList] GET /watchlist response:', data); } catch (e) {}
         const myWatchlist = data.watchlist || { properties: [] };
-
-        if (!Array.isArray(myWatchlist.properties)) {
-          setProperties([]);
-        } else {
-          setProperties(myWatchlist.properties);
+        // dedupe by flat_id to avoid duplicate cards in UI while backend is investigated
+        const propsArr = Array.isArray(myWatchlist.properties) ? myWatchlist.properties : [];
+        const seen = new Set();
+        const deduped = [];
+        for (const p of propsArr) {
+          const id = p && p.flat_id;
+          if (id == null) { deduped.push(p); continue; }
+          if (!seen.has(String(id))) {
+            seen.add(String(id));
+            deduped.push(p);
+          }
         }
+        setProperties(deduped);
       } catch (err) {
         console.error('Watchlist fetch error:', err);
         setError('Failed to load watchlist.');
+        setProperties([]);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchWatchlist();
-    // also preload recent listings for 'Explore' mode
-    const fetchListings = async () => {
-      try {
-        const resp = await fetch(`${API_URL}/listings?limit=30`);
-        if (!resp.ok) throw new Error(`Failed to load listings (${resp.status})`);
-        const json = await resp.json();
-  const fetched = json.listings || [];
-  setListings(fetched);
-      } catch (e) {
-        console.error('Listing fetch error:', e);
-  // on error, show empty list (no local fallback)
-  setListings([]);
-      }
-    };
-    fetchListings();
-  }, []);
+    })();
+  }, [mode]);
 
   const token = localStorage.getItem('token');
 
@@ -153,15 +206,28 @@ export default function WatchList() {
       const resp = await fetch(`${API_URL}/watchlist/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ flat_id: item.flat_id, town: item.town, block: item.block, street_name: item.street_name, flat_type: item.flat_type })
+        body: JSON.stringify({
+          flat_id: item.flat_id,
+          note: item.note || null,
+          metadata: {
+            resale_price: item.resale_price || null,
+            floor_area_sqm: item.floor_area_sqm || null,
+            remaining_lease_years_at_sale: item.remaining_lease_years_at_sale || null,
+            postal_code: item.postal_code || null,
+            block: item.block || null,
+            street_name: item.street_name || null,
+            flat_type: item.flat_type || null,
+            town: item.town || null
+          }
+        })
       });
       const json = await resp.json();
-      if (!json.success) throw new Error(json.message || 'Failed');
-      setProperties(json.watchlist.properties || []);
-  pushToast('Added to watchlist', 'success');
+    if (!json.success) throw new Error(json.message || 'Failed');
+    setProperties(json.watchlist.properties || []);
+    console.log('Added to watchlist');
     } catch (e) {
       console.error('Add error:', e);
-  pushToast('Failed to add to watchlist', 'error');
+      alert('Failed to add to watchlist');
     } finally {
       setActionLoading(false);
     }
@@ -169,7 +235,7 @@ export default function WatchList() {
 
   const removeFromWatchlist = async (flatId) => {
     if (!token) {
-      pushToast('Please sign in to update your watchlist', 'error');
+      alert('Please sign in to update your watchlist');
       return;
     }
     setActionLoading(true);
@@ -182,10 +248,10 @@ export default function WatchList() {
       const json = await resp.json();
       if (!json.success) throw new Error(json.message || 'Failed');
       setProperties(json.watchlist ? (json.watchlist.properties || []) : []);
-  pushToast('Removed from watchlist', 'success');
+      console.log('Removed from watchlist');
     } catch (e) {
       console.error('Remove error:', e);
-  pushToast('Failed to remove from watchlist', 'error');
+  alert('Failed to remove from watchlist');
     } finally {
       setActionLoading(false);
     }
@@ -207,9 +273,8 @@ export default function WatchList() {
         <div className="p-10 bg-white border-2 border-gray-200 rounded-2xl text-center text-gray-600">
           <p className="text-lg font-medium">You don't have any saved properties yet.</p>
           <p className="mt-2">Find resale listings and add them to your watchlist.</p>
-          <div className="mt-6 flex items-center justify-center space-x-3">
+          <div className="mt-6 flex items-center justify-center">
             <button onClick={() => setMode('explore')} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Explore Listings</button>
-            <button onClick={() => { setMode('explore'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="px-4 py-2 bg-white border rounded-lg">Explore &amp; Scroll</button>
           </div>
 
           {listings && listings.length > 0 && (
@@ -228,29 +293,81 @@ export default function WatchList() {
     } else {
       content = (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {properties.map((p, idx) => (
-            <div key={p.flat_id || idx}>
-              <ListingCard property={p} />
-              <div className="mt-2 flex justify-end">
-                <button onClick={() => removeFromWatchlist(p.flat_id)} disabled={actionLoading} className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm">Remove</button>
-              </div>
-            </div>
-          ))}
+          {(() => {
+            try { console.debug('[WatchList:my] rendering properties flat_ids:', (properties || []).map(p => p.flat_id)); } catch(e) {}
+            return properties.map((p, idx) => (
+              <ListingCard 
+                key={p.flat_id || idx}
+                property={p}
+                onRemoveFromWatchlist={removeFromWatchlist}
+                actionLoading={actionLoading}
+                mode="my"
+              />
+            ));
+          })()}
         </div>
       );
     }
   } else {
-    // explore mode
+    // explore mode - group by block + street + town, collapse duplicate transactions and show one listing per address
+    const groups = {};
+    for (const l of listings) {
+      const blk = (l.block || l.block_no || 'Unknown').toString();
+      const street = (l.street_name || '').toString();
+      const townName = (l.town || '').toString();
+      const key = `${blk}|||${street}|||${townName}`;
+      if (!groups[key]) groups[key] = { block: blk, street, townName, items: [] };
+      groups[key].items.push(l);
+    }
+
+    const savedSet = new Set((properties || []).map(p => p.flat_id));
+
+    // build group entries, compute min/max per group, pick representative (most recent contract_date if available)
+    const groupEntries = Object.keys(groups).map(k => {
+      const g = groups[k];
+      const prices = g.items.map(x => Number(x.resale_price) || 0).filter(v => v > 0);
+      const min = prices.length ? Math.min(...prices) : null;
+      const max = prices.length ? Math.max(...prices) : null;
+      // pick most recent transaction by contract_date if present
+      let rep = g.items[0];
+      try {
+        const sorted = g.items.slice().sort((a, b) => {
+          const ta = a.contract_date ? new Date(a.contract_date).getTime() : 0;
+          const tb = b.contract_date ? new Date(b.contract_date).getTime() : 0;
+          return tb - ta;
+        });
+        if (sorted && sorted.length) rep = sorted[0];
+      } catch (e) {
+        // fall back to first
+      }
+  const annotated = { ...rep, block_min_price: min, block_max_price: max, merged_count: g.items.length };
+  return { key: k, block: g.block, street: g.street, townName: g.townName, listing: annotated, count: g.items.length };
+    });
+
+    // sort groups by numeric block then street then town (keeps consistent order)
+    groupEntries.sort((a, b) => {
+      const an = parseInt(a.block, 10); const bn = parseInt(b.block, 10);
+      if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn;
+      if (a.block !== b.block) return String(a.block).localeCompare(String(b.block));
+      if (a.street !== b.street) return String(a.street).localeCompare(String(b.street));
+      return String(a.townName).localeCompare(String(b.townName));
+    });
+
+    // build a flat list of representative listings (no headers) and render as a grid
+    const displayListings = groupEntries.map(g => g.listing);
+
     content = (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {listings.map((l, i) => (
-          <div key={l.flat_id || i}>
-            <ListingCard property={l} />
-            <div className="mt-2 flex justify-between items-center">
-              <div className="text-sm text-gray-500">{new Date(l.contract_date).toLocaleDateString()}</div>
-              <button onClick={() => addToWatchlist(l)} disabled={actionLoading} className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm">Add</button>
-            </div>
-          </div>
+        {displayListings.map((l, i) => (
+          <ListingCard
+            key={l.flat_id || i}
+            property={l}
+            onAddToWatchlist={addToWatchlist}
+            onRemoveFromWatchlist={removeFromWatchlist}
+            actionLoading={actionLoading}
+            mode="explore"
+            isSaved={savedSet.has(l.flat_id)}
+          />
         ))}
       </div>
     );
@@ -260,34 +377,30 @@ export default function WatchList() {
     <div className="min-h-screen bg-gray-50">
       <Navigation />
 
-      {/* Toast container */}
-      <div className="fixed top-6 right-6 z-50 space-y-2">
-        {toasts.map((t) => (
-          <div key={t.id} className={`px-4 py-2 rounded shadow-md text-sm ${t.type === 'success' ? 'bg-green-500 text-white' : t.type === 'error' ? 'bg-red-500 text-white' : 'bg-gray-800 text-white'}`}>
-            {t.message}
-          </div>
-        ))}
-      </div>
+      {/* no toast UI; use console / alert for feedback */}
 
       <div className="pt-28 pb-12 px-6 max-w-7xl mx-auto">
 
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-black text-gray-900">{mode === 'explore' ? 'Explore Listings' : 'My Watchlist'}</h1>
-            <p className="text-gray-600 mt-2">{mode === 'explore' ? 'Browse recent resale transactions and add items to your watchlist.' : `Saved properties you're watching. We'll track price changes and let you set alerts.`}</p>
+            <h1 className="text-5xl font-black text-gray-900">{mode === 'explore' ? 'Explore Listings' : 'My Watchlist'}</h1>
+            <p className="text-xl text-gray-600 mt-2">{mode === 'explore' ? 'Browse recent resale transactions and add items to your watchlist.' : `Saved properties you're watching.`}</p>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={() => setMode('my')}
-              className={`px-4 py-2 rounded-lg ${mode === 'my' ? 'bg-blue-600 text-white' : 'bg-white border'}`}>
-              My Watchlist
-            </button>
-            <button
-              onClick={() => setMode('explore')}
-              className={`px-4 py-2 rounded-lg ${mode === 'explore' ? 'bg-blue-600 text-white' : 'bg-white border'}`}>
-              Explore Listings
-            </button>
+          <div>
+            {mode === 'explore' ? (
+              <button
+                onClick={() => setMode('my')}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                View My Watchlist
+              </button>
+            ) : (
+              <button
+                onClick={() => setMode('explore')}
+                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                Explore Listings
+              </button>
+            )}
           </div>
         </div>
 
