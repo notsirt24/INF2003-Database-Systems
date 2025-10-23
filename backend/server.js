@@ -42,6 +42,10 @@ app.use('/api/listings', listingRoutes);
 const watchlistRoutes = require('./routes/watchlistRoutes');
 app.use('/api', watchlistRoutes);
 
+// Map routes (MRT, Schools, Bus Stops, EV Charging)
+const mapRoutes = require('./routes/mapRoutes');
+app.use('/api/map', mapRoutes);
+
 // ============================================
 // TEST ENDPOINTS (Optional - for debugging)
 // ============================================

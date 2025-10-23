@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Watchlist from './pages/WatchList';
+import InteractiveMap from './pages/InteractiveMap';
 // import MapView from './pages/MapView';
 // import Login from './pages/Login';
 // import Register from './pages/Register';
@@ -32,7 +33,7 @@ function App() {
           {/* Uncomment these routes as you create the pages */}
           <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dashboard" element={ <ProtectedRoute> <Dashboard /> </ProtectedRoute> }/>
-          {/* <Route path="/map" element={<MapView />} /> */}
+          <Route path="/map" element={<InteractiveMap />} />
           {/* <Route path="/login" element={<Login />} /> */}
           {/* <Route path="/register" element={<Register />} /> */}
           {/* <Route path="/property/:id" element={<PropertyDetails />} /> */}
