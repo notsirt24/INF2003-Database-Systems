@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Navigation from '../components/Navigation';
+import { Link } from 'react-router-dom';
 // icons rendered inline to avoid unused import lint
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
@@ -121,26 +122,11 @@ export default function WatchList() {
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState([]);
   const [error, setError] = useState(null);
-  const [mode, setMode] = useState('my'); // 'my' or 'explore'
-  const [listings, setListings] = useState([]);
+  const mode = 'my';
   const [actionLoading, setActionLoading] = useState(false);
   // no toast UI — use console logs / alerts for feedback
 
-  // Fetch listings once on mount (explore data)
-  useEffect(() => {
-    (async () => {
-      try {
-        const resp = await fetch(`${API_URL}/listings?limit=30`);
-        if (!resp.ok) throw new Error(`Failed to load listings (${resp.status})`);
-        const json = await resp.json();
-        const fetched = json.listings || [];
-        setListings(fetched);
-      } catch (e) {
-        console.error('Listing fetch error:', e);
-        setListings([]);
-      }
-    })();
-  }, []);
+  // Explore listings removed from this page; this component shows only 'My Watchlist'.
 
   // Fetch watchlist whenever the user switches to 'my' mode
   useEffect(() => {
@@ -173,7 +159,7 @@ export default function WatchList() {
         const data = await res.json();
         // debug server response
         try { console.debug('[WatchList] GET /watchlist response:', data); } catch (e) {}
-        const myWatchlist = data.watchlist || { properties: [] };
+  const myWatchlist = data.watchlist || { properties: [] };
         // dedupe by flat_id to avoid duplicate cards in UI while backend is investigated
         const propsArr = Array.isArray(myWatchlist.properties) ? myWatchlist.properties : [];
         const seen = new Set();
@@ -199,39 +185,7 @@ export default function WatchList() {
 
   const token = localStorage.getItem('token');
 
-  const addToWatchlist = async (item) => {
-    if (!token) return alert('Please sign in to save to your watchlist');
-    setActionLoading(true);
-    try {
-      const resp = await fetch(`${API_URL}/watchlist/add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          flat_id: item.flat_id,
-          note: item.note || null,
-          metadata: {
-            resale_price: item.resale_price || null,
-            floor_area_sqm: item.floor_area_sqm || null,
-            remaining_lease_years_at_sale: item.remaining_lease_years_at_sale || null,
-            postal_code: item.postal_code || null,
-            block: item.block || null,
-            street_name: item.street_name || null,
-            flat_type: item.flat_type || null,
-            town: item.town || null
-          }
-        })
-      });
-      const json = await resp.json();
-    if (!json.success) throw new Error(json.message || 'Failed');
-    setProperties(json.watchlist.properties || []);
-    console.log('Added to watchlist');
-    } catch (e) {
-      console.error('Add error:', e);
-      alert('Failed to add to watchlist');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  // adding from explore removed — watchlist page only supports removal
 
   const removeFromWatchlist = async (flatId) => {
     if (!token) {
@@ -274,20 +228,8 @@ export default function WatchList() {
           <p className="text-lg font-medium">You don't have any saved properties yet.</p>
           <p className="mt-2">Find resale listings and add them to your watchlist.</p>
           <div className="mt-6 flex items-center justify-center">
-            <button onClick={() => setMode('explore')} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Explore Listings</button>
+            <Link to="/" className="px-4 py-2 bg-blue-600 text-white rounded-lg">Browse Listings</Link>
           </div>
-
-          {listings && listings.length > 0 && (
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {listings.slice(0, 3).map((l) => (
-                <div key={l.flat_id} className="bg-gray-50 p-3 border rounded-lg text-left">
-                  <div className="text-sm font-semibold">{l.block} {l.street_name}</div>
-                  <div className="text-xs text-gray-500">{l.town} • {l.flat_type}</div>
-                  <div className="text-sm font-bold mt-2">{l.resale_price ? `S$ ${Number(l.resale_price).toLocaleString()}` : 'Price n/a'}</div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       );
     } else {
@@ -308,69 +250,6 @@ export default function WatchList() {
         </div>
       );
     }
-  } else {
-    // explore mode - group by block + street + town, collapse duplicate transactions and show one listing per address
-    const groups = {};
-    for (const l of listings) {
-      const blk = (l.block || l.block_no || 'Unknown').toString();
-      const street = (l.street_name || '').toString();
-      const townName = (l.town || '').toString();
-      const key = `${blk}|||${street}|||${townName}`;
-      if (!groups[key]) groups[key] = { block: blk, street, townName, items: [] };
-      groups[key].items.push(l);
-    }
-
-    const savedSet = new Set((properties || []).map(p => p.flat_id));
-
-    // build group entries, compute min/max per group, pick representative (most recent contract_date if available)
-    const groupEntries = Object.keys(groups).map(k => {
-      const g = groups[k];
-      const prices = g.items.map(x => Number(x.resale_price) || 0).filter(v => v > 0);
-      const min = prices.length ? Math.min(...prices) : null;
-      const max = prices.length ? Math.max(...prices) : null;
-      // pick most recent transaction by contract_date if present
-      let rep = g.items[0];
-      try {
-        const sorted = g.items.slice().sort((a, b) => {
-          const ta = a.contract_date ? new Date(a.contract_date).getTime() : 0;
-          const tb = b.contract_date ? new Date(b.contract_date).getTime() : 0;
-          return tb - ta;
-        });
-        if (sorted && sorted.length) rep = sorted[0];
-      } catch (e) {
-        // fall back to first
-      }
-  const annotated = { ...rep, block_min_price: min, block_max_price: max, merged_count: g.items.length };
-  return { key: k, block: g.block, street: g.street, townName: g.townName, listing: annotated, count: g.items.length };
-    });
-
-    // sort groups by numeric block then street then town (keeps consistent order)
-    groupEntries.sort((a, b) => {
-      const an = parseInt(a.block, 10); const bn = parseInt(b.block, 10);
-      if (!isNaN(an) && !isNaN(bn) && an !== bn) return an - bn;
-      if (a.block !== b.block) return String(a.block).localeCompare(String(b.block));
-      if (a.street !== b.street) return String(a.street).localeCompare(String(b.street));
-      return String(a.townName).localeCompare(String(b.townName));
-    });
-
-    // build a flat list of representative listings (no headers) and render as a grid
-    const displayListings = groupEntries.map(g => g.listing);
-
-    content = (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {displayListings.map((l, i) => (
-          <ListingCard
-            key={l.flat_id || i}
-            property={l}
-            onAddToWatchlist={addToWatchlist}
-            onRemoveFromWatchlist={removeFromWatchlist}
-            actionLoading={actionLoading}
-            mode="explore"
-            isSaved={savedSet.has(l.flat_id)}
-          />
-        ))}
-      </div>
-    );
   }
 
   return (
@@ -383,24 +262,8 @@ export default function WatchList() {
 
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-5xl font-black text-gray-900">{mode === 'explore' ? 'Explore Listings' : 'My Watchlist'}</h1>
-            <p className="text-xl text-gray-600 mt-2">{mode === 'explore' ? 'Browse recent resale transactions and add items to your watchlist.' : `Saved properties you're watching.`}</p>
-          </div>
-
-          <div>
-            {mode === 'explore' ? (
-              <button
-                onClick={() => setMode('my')}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                View My Watchlist
-              </button>
-            ) : (
-              <button
-                onClick={() => setMode('explore')}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                Explore Listings
-              </button>
-            )}
+            <h1 className="text-5xl font-black text-gray-900">My Watchlist</h1>
+            <p className="text-xl text-gray-600 mt-2">Saved properties you're watching.</p>
           </div>
         </div>
 

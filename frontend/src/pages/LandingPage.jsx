@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Home, TrendingUp, Map, MessageSquare, Star, Bookmark, Database, Cpu, Globe, ChevronRight, BarChart3, Building2, School, Zap, Train, Sparkles, Brain, Clock, Shield, Menu, X, Search, User, Cloud, Book } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Navigation from '../components/Navigation';
+import ListOfListings from '../components/ListOfListings';
 
 export default function HDBLandingPage() {
   const [scrollY, setScrollY] = useState(0);
@@ -253,8 +254,11 @@ export default function HDBLandingPage() {
         </div>
       </div>
 
-      {/* Problem Statement Section */}
-      <section className="py-24 px-6 bg-gray-50">
+  {/* Insert Explore listings section before problem statement */}
+  <ListOfListings />
+
+  {/* Problem Statement Section */}
+  <section className="py-24 px-6 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-5xl lg:text-6xl font-black text-gray-900 mb-6">
