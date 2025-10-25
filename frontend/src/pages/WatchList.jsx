@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
-function ListingCard({ property, onAddToWatchlist, onRemoveFromWatchlist, actionLoading, mode = 'explore', isSaved = false }) {
+function ListingCard({ property, onAddToWatchlist, onRemoveFromWatchlist, onToggleCompare, isCompared = false, actionLoading, mode = 'explore', isSaved = false }) {
   const { town, block, street_name, flat_type, resale_price, floor_area_sqm, remaining_lease_years_at_sale, block_min_price, block_max_price, merged_count } = property;
   const canAdd = typeof onAddToWatchlist === 'function';
   const canRemove = typeof onRemoveFromWatchlist === 'function';
@@ -78,18 +78,33 @@ function ListingCard({ property, onAddToWatchlist, onRemoveFromWatchlist, action
           </div>
         </div>
 
-        <div className="pt-4 flex justify-end">
-          {mode === 'my' && canRemove ? (
-            <button
-              onClick={() => onRemoveFromWatchlist(property.flat_id)}
-              disabled={actionLoading}
-              className="p-2 text-red-500 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-50"
-              title="Remove from Watchlist"
-            >
-              <svg className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path d="M6 18L18 6M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
+        <div className="pt-4 flex justify-end items-center space-x-3">
+          {mode === 'my' ? (
+            <>
+              {/* compare toggle */}
+              <button
+                onClick={() => typeof onToggleCompare === 'function' ? onToggleCompare(property.flat_id) : null}
+                disabled={actionLoading}
+                aria-pressed={isCompared}
+                className={`p-2 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isCompared ? 'bg-yellow-50 text-yellow-600' : 'text-gray-400 hover:text-yellow-600'}`}
+                title={isCompared ? 'Remove from comparison' : 'Compare this property'}
+              >
+                {/* simple compare icon */}
+                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h7v14H3zM14 3h7v18h-7z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </button>
+              {canRemove ? (
+                <button
+                  onClick={() => onRemoveFromWatchlist(property.flat_id)}
+                  disabled={actionLoading}
+                  className="p-2 text-red-500 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-red-50"
+                  title="Remove from Watchlist"
+                >
+                  <svg className="w-7 h-7 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M6 18L18 6M6 6l12 12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              ) : null}
+            </>
           ) : (mode === 'explore' && canAdd) ? (
             // In explore mode show a bookmark toggle: add when not saved, remove when saved
             <button
@@ -124,6 +139,17 @@ export default function WatchList() {
   const [error, setError] = useState(null);
   const mode = 'my';
   const [actionLoading, setActionLoading] = useState(false);
+  const [compareSelections, setCompareSelections] = useState([]);
+  const toggleCompare = (flatId) => {
+    setCompareSelections(prev => {
+      if (!flatId) return prev;
+      const s = Array.isArray(prev) ? prev.slice() : [];
+      const idx = s.indexOf(flatId);
+      if (idx >= 0) { s.splice(idx, 1); return s; }
+      s.push(flatId); return s;
+    });
+  };
+  const clearCompare = () => setCompareSelections([]);
   // no toast UI — use console logs / alerts for feedback
 
   // Explore listings removed from this page; this component shows only 'My Watchlist'.
@@ -242,6 +268,8 @@ export default function WatchList() {
                 key={p.flat_id || idx}
                 property={p}
                 onRemoveFromWatchlist={removeFromWatchlist}
+                onToggleCompare={toggleCompare}
+                isCompared={compareSelections.includes(p.flat_id)}
                 actionLoading={actionLoading}
                 mode="my"
               />
@@ -266,6 +294,43 @@ export default function WatchList() {
             <p className="text-xl text-gray-600 mt-2">Saved properties you're watching.</p>
           </div>
         </div>
+
+        {/* Comparison panel: appears when user selects listings to compare */}
+        {compareSelections && compareSelections.length > 0 && (
+          <section className="mb-6">
+            <div className="bg-white border border-gray-200 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold">Compare ({compareSelections.length})</h3>
+                <div className="flex items-center space-x-2">
+                  <button onClick={clearCompare} className="px-3 py-1 rounded-md border text-sm text-gray-700 hover:bg-gray-100">Clear</button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {properties.filter(p => compareSelections.includes(p.flat_id)).map((p) => (
+                  <div key={p.flat_id} className="bg-gray-50 border rounded-lg p-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="text-sm text-gray-600">{p.town} • {p.flat_type}</div>
+                        <div className="text-lg font-bold">{p.block} {p.street_name}</div>
+                        <div className="text-sm font-extrabold mt-2">{p.resale_price ? `S$ ${Number(p.resale_price).toLocaleString()}` : 'Price n/a'}</div>
+                      </div>
+                      <button onClick={() => toggleCompare(p.flat_id)} className="text-red-500 ml-2" title="Remove from compare">
+                        ×
+                      </button>
+                    </div>
+
+                    <div className="mt-3 text-sm text-gray-700 space-y-1">
+                      <div><strong>Area:</strong> {p.floor_area_sqm ? `${Math.round(p.floor_area_sqm)} m²` : '—'}</div>
+                      <div><strong>Lease left:</strong> {p.remaining_lease_years_at_sale ? `${Math.round(p.remaining_lease_years_at_sale)} yrs` : '—'}</div>
+                      {p.merged_count && p.merged_count > 1 && <div><strong>Transactions:</strong> {p.merged_count}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {content}
       </div>
