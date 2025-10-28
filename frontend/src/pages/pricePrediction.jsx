@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Sparkles, ChevronDown, AlertCircle } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
+// import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area } from 'recharts';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
@@ -234,17 +235,17 @@ export default function PricePredictionSection() {
                     </div>
 
                     {/* Chart */}
+                    {/* Chart */}
                     <div className="bg-white rounded-xl p-6 shadow-md">
-                        <ResponsiveContainer width="100%" height={400}>
-                            <AreaChart data={predictionData.predictions}>
+                        <ResponsiveContainer width="100%" height={450}>
+                            <ComposedChart
+                                data={predictionData.predictions}
+                                margin={{ top: 10, right: 30, left: 20, bottom: 80 }}
+                            >
                                 <defs>
-                                    <linearGradient id="historicalGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                                    </linearGradient>
-                                    <linearGradient id="predictedGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#9333ea" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
+                                    <linearGradient id="confidenceGradient" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#e9d5ff" stopOpacity={0.8} />
+                                        <stop offset="95%" stopColor="#e9d5ff" stopOpacity={0.3} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -252,27 +253,25 @@ export default function PricePredictionSection() {
                                     dataKey="month"
                                     stroke="#6b7280"
                                     tick={{ fontSize: 10 }}
-                                    angle={-40}
+                                    angle={-45}
                                     textAnchor="end"
-                                    interval={
-                                        predictionData && predictionData.predictions.length > 36
-                                            ? Math.floor(predictionData.predictions.length / 12)
-                                            : 0
-                                    }
+                                    height={80}
+                                    interval={Math.floor(predictionData.predictions.length / 15)}
                                 />
                                 <YAxis
                                     stroke="#6b7280"
                                     tickFormatter={formatCurrency}
+                                    width={80}
                                 />
                                 <Tooltip content={<CustomTooltip />} />
 
-                                {/* Confidence interval area */}
+                                {/* Confidence interval area - only for predicted data */}
                                 <Area
                                     type="monotone"
                                     dataKey="upperBound"
                                     stroke="none"
-                                    fill="#e9d5ff"
-                                    fillOpacity={0.3}
+                                    fill="url(#confidenceGradient)"
+                                    fillOpacity={1}
                                 />
                                 <Area
                                     type="monotone"
@@ -282,45 +281,45 @@ export default function PricePredictionSection() {
                                     fillOpacity={1}
                                 />
 
-                                {/* Historical line - only show where isHistorical is true */}
+                                {/* Historical line (solid blue) */}
                                 <Line
                                     type="monotone"
-                                    dataKey="price"
+                                    dataKey={(entry) => entry.isHistorical ? entry.price : null}
                                     stroke="#2563eb"
                                     strokeWidth={3}
                                     dot={false}
                                     name="Historical"
                                     connectNulls={false}
-                                    data={predictionData.predictions.filter(d => d.isHistorical)}
+                                    isAnimationActive={false}
                                 />
 
-                                {/* Predicted line - only show where isHistorical is false */}
+                                {/* Predicted line (dashed purple) */}
                                 <Line
                                     type="monotone"
-                                    dataKey="price"
+                                    dataKey={(entry) => !entry.isHistorical ? entry.price : null}
                                     stroke="#9333ea"
                                     strokeWidth={3}
                                     strokeDasharray="5 5"
                                     dot={false}
                                     name="Predicted"
                                     connectNulls={false}
-                                    data={predictionData.predictions.filter(d => !d.isHistorical)}
+                                    isAnimationActive={false}
                                 />
-                            </AreaChart>
+                            </ComposedChart>
                         </ResponsiveContainer>
 
                         <div className="mt-4 flex items-center justify-center space-x-6 text-sm">
                             <div className="flex items-center space-x-2">
-                                <div className="w-4 h-0.5 bg-blue-600"></div>
-                                <span className="text-gray-600">Historical Data</span>
+                                <div className="w-6 h-1 bg-blue-600"></div>
+                                <span className="text-gray-600 font-medium">Historical Data</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <div className="w-4 h-0.5 bg-purple-600 border-dashed"></div>
-                                <span className="text-gray-600">Predicted Trend</span>
+                                <div className="w-6 h-1 bg-purple-600" style={{ borderTop: '3px dashed #9333ea' }}></div>
+                                <span className="text-gray-600 font-medium">Predicted Trend</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <div className="w-4 h-3 bg-purple-200"></div>
-                                <span className="text-gray-600">95% Confidence Interval</span>
+                                <div className="w-6 h-4 bg-purple-200 rounded"></div>
+                                <span className="text-gray-600 font-medium">95% Confidence Interval</span>
                             </div>
                         </div>
                     </div>

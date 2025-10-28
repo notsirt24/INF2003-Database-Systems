@@ -1,7 +1,5 @@
 // ============================================
 // Import and Normalize CSV Data to PostgreSQL
-// File: database/scripts/import-normalized-data.js
-// Matches normalized schema design
 // ============================================
 
 const fs = require('fs');
