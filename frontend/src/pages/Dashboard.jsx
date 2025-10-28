@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Home, TrendingUp, Map, MessageSquare, Bookmark, Menu, X, Building2, DollarSign, Calendar, MapPin, Filter, RefreshCw, ArrowUpRight, ArrowDownRight, Minus, Book, Cloud } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import Navigation from '../components/Navigation';
+import PricePredictionSection from './pricePrediction';
 
 // API endpoint for backend queries
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 export default function HDBDashboard() {
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [selectedTown, setSelectedTown] = useState('All');
-    const [selectedYear, setSelectedYear] = useState('2025');
-    const [dateRange, setDateRange] = useState('12m');
+    const [selectedYear, setSelectedYear] = useState('All');
+    const [dateRange, setDateRange] = useState('1y');
 
     // Data states
     const [priceData, setPriceData] = useState([]);
@@ -34,37 +34,46 @@ export default function HDBDashboard() {
     const [comparisonTowns, setComparisonTowns] = useState([]);
     const [showAddTownModal, setShowAddTownModal] = useState(false);
 
-    const navItems = [
-        { name: 'Home', icon: Home, path: '/' },
-        { name: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
-        { name: 'Map', icon: Map, path: '/map' },
-        { name: 'AI-Chatbot', icon: Cloud, path: '/chatbot' },
-        { name: 'Watchlist', icon: Bookmark, path: '/watchlist' },
-        { name: 'Reviews', icon: Book, path: '/reviews' },
-    ];
-
     const COLORS = ['#2563eb', '#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
+
+    // Time range options - changes based on year selection
+    const timeRangeOptions = selectedYear === 'All'
+        ? [
+            { value: '3m', label: '3 Months' },
+            { value: '6m', label: '6 Months' },
+            { value: '1y', label: '1 Year' },
+            { value: '2y', label: '2 Years' },
+            { value: '3y', label: '3 Years' },
+            { value: '5y', label: '5 Years' },
+            { value: 'all', label: 'All Time' }
+        ]
+        : [];
 
     useEffect(() => {
         fetchTowns();
     }, []);
 
-    // Add effect to refetch town comparison when comparison towns change
     useEffect(() => {
         if (selectedTown !== 'All' && comparisonTowns.length > 0) {
             fetchTownComparison();
         }
-    }, [comparisonTowns, selectedYear, dateRange]); // Add selectedYear and dateRange as dependencies
+    }, [comparisonTowns, selectedYear, dateRange]);
 
-    // Fetch town comparison whenever comparisonTowns, year, or range changes
     useEffect(() => {
         fetchTownComparison();
     }, [comparisonTowns, selectedYear, dateRange]);
 
-    // Main dashboard data (excluding town comparison)
     useEffect(() => {
         fetchDashboardData();
     }, [selectedTown, selectedYear, dateRange]);
+
+    useEffect(() => {
+        if (selectedTown !== 'All') {
+            setComparisonTowns([selectedTown]);
+        } else {
+            setComparisonTowns([]);
+        }
+    }, [selectedTown]);
 
     const fetchTowns = async () => {
         try {
@@ -108,7 +117,6 @@ export default function HDBDashboard() {
         try {
             let url = `${API_URL}/dashboard/town-comparison?year=${selectedYear}&range=${dateRange}`;
 
-            // If specific town selected and we have comparison towns, send them
             if (selectedTown !== 'All' && comparisonTowns.length > 0) {
                 const townsParam = comparisonTowns.join(',');
                 url += `&towns=${townsParam}`;
@@ -123,18 +131,6 @@ export default function HDBDashboard() {
         }
     };
 
-    // Add effect to reset comparison towns when selectedTown changes
-    useEffect(() => {
-        if (selectedTown !== 'All') {
-            // Start with just the selected town
-            setComparisonTowns([selectedTown]);
-        } else {
-            // Reset comparison towns when "All" is selected
-            setComparisonTowns([]);
-        }
-    }, [selectedTown]);
-
-    // Function to add a town for comparison
     const addTownForComparison = (town) => {
         if (comparisonTowns.length < 10 && !comparisonTowns.includes(town)) {
             setComparisonTowns([...comparisonTowns, town]);
@@ -142,9 +138,7 @@ export default function HDBDashboard() {
         }
     };
 
-    // Function to remove a town from comparison
     const removeTownFromComparison = (town) => {
-        // Don't allow removing the originally selected town
         if (town === selectedTown) return;
         setComparisonTowns(comparisonTowns.filter(t => t !== town));
     };
@@ -204,7 +198,7 @@ export default function HDBDashboard() {
     };
 
     const formatCurrency = (value) => {
-        return `$${(value / 1000).toFixed(0)}K`;
+        return `${(value / 1000).toFixed(0)}K`;
     };
 
     const formatNumber = (value) => {
@@ -242,72 +236,7 @@ export default function HDBDashboard() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            {/* Navigation */}
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg shadow-lg">
-                <div className="max-w-7xl mx-auto px-6">
-                    <div className="flex items-center justify-between h-20">
-                        <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl flex items-center justify-center">
-                                <Building2 className="w-6 h-6 text-white" />
-                            </div>
-                            <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                                HDB Analytics
-                            </span>
-                        </div>
-
-                        <div className="hidden md:flex items-center space-x-1">
-                            {navItems.map((item) => {
-                                const Icon = item.icon;
-                                const isActive = item.path === '/dashboard';
-                                return (
-                                    <a
-                                        key={item.name}
-                                        href={item.path}
-                                        className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isActive ? 'bg-blue-100 text-blue-600' : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'
-                                            }`}
-                                    >
-                                        <Icon className="w-4 h-4" />
-                                        <span className="font-medium">{item.name}</span>
-                                    </a>
-                                );
-                            })}
-                        </div>
-
-                        <div>
-                            <Navigation />
-                            <div className="pt-28 pb-12 px-6 max-w-7xl mx-auto">
-                            </div>
-                        </div>
-
-                        <button
-                            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
-                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                        >
-                            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-                        </button>
-                    </div>
-                </div>
-
-                {mobileMenuOpen && (
-                    <div className="md:hidden bg-white border-t border-gray-200">
-                        <div className="px-6 py-4 space-y-2">
-                            {navItems.map((item) => {
-                                const Icon = item.icon;
-                                return (
-                                    <a
-                                        key={item.name}
-                                        href={item.path}
-                                        className="flex items-center space-x-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-blue-600"
-                                    >
-                                        <Icon className="w-5 h-5" />
-                                        <span className="font-medium">{item.name}</span>
-                                    </a>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-            </nav>
+            <Navigation />
 
             {/* Main Content */}
             <div className="pt-28 pb-12 px-6 max-w-7xl mx-auto">
@@ -341,28 +270,33 @@ export default function HDBDashboard() {
                             className="px-4 py-2 border-2 border-gray-300 rounded-lg font-medium focus:border-blue-500 focus:outline-none"
                         >
                             <option value="All">All Years</option>
-                            {['2025', '2024', '2023', '2022', '2021', '2020'].map(year => (
+                            {['2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017'].map(year => (
                                 <option key={year} value={year}>{year}</option>
                             ))}
                         </select>
 
-                        <div className="flex bg-gray-100 rounded-lg p-1">
-                            {['6m', '12m', '24m'].map(range => (
-                                <button
-                                    key={range}
-                                    onClick={() => setDateRange(range)}
-                                    disabled={selectedYear !== 'All'}
-                                    className={`px-4 py-2 rounded-lg font-medium transition-all ${dateRange === range && selectedYear === 'All'
-                                        ? 'bg-white shadow-md text-blue-600'
-                                        : selectedYear === 'All'
-                                            ? 'text-gray-600 hover:text-gray-900'
-                                            : 'text-gray-400 cursor-not-allowed'
-                                        }`}
-                                >
-                                    {range === '6m' ? '6 Months' : range === '12m' ? '1 Year' : '2 Years'}
-                                </button>
-                            ))}
-                        </div>
+                        {selectedYear === 'All' && (
+                            <div className="flex bg-gray-100 rounded-lg p-1 flex-wrap gap-1">
+                                {timeRangeOptions.map(option => (
+                                    <button
+                                        key={option.value}
+                                        onClick={() => setDateRange(option.value)}
+                                        className={`px-3 py-2 rounded-lg font-medium transition-all text-sm whitespace-nowrap ${dateRange === option.value
+                                            ? 'bg-white shadow-md text-blue-600'
+                                            : 'text-gray-600 hover:text-gray-900'
+                                            }`}
+                                    >
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {selectedYear !== 'All' && (
+                            <div className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm">
+                                Showing full year {selectedYear}
+                            </div>
+                        )}
 
                         <button
                             onClick={fetchDashboardData}
@@ -426,7 +360,7 @@ export default function HDBDashboard() {
                                     <XAxis dataKey="month" stroke="#6b7280" />
                                     <YAxis stroke="#6b7280" tickFormatter={formatCurrency} />
                                     <Tooltip
-                                        formatter={(value) => [`$${formatNumber(value)}`, 'Price']}
+                                        formatter={(value) => [`${formatNumber(value)}`, 'Price']}
                                         contentStyle={{ borderRadius: '12px', border: '2px solid #e5e7eb' }}
                                     />
                                     <Area
@@ -457,7 +391,6 @@ export default function HDBDashboard() {
                                     )}
                                 </div>
 
-                                {/* Show selected towns chips when specific town is selected */}
                                 {selectedTown !== 'All' && comparisonTowns.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-4">
                                         {comparisonTowns.map(town => (
@@ -488,7 +421,7 @@ export default function HDBDashboard() {
                                         <XAxis dataKey="town" stroke="#6b7280" angle={-45} textAnchor="end" height={100} />
                                         <YAxis stroke="#6b7280" tickFormatter={formatCurrency} />
                                         <Tooltip
-                                            formatter={(value) => [`$${formatNumber(value)}`, 'Avg Price']}
+                                            formatter={(value) => [`${formatNumber(value)}`, 'Avg Price']}
                                             contentStyle={{ borderRadius: '12px', border: '2px solid #e5e7eb' }}
                                         />
                                         <Bar dataKey="avgPrice" radius={[8, 8, 0, 0]}>
@@ -499,8 +432,6 @@ export default function HDBDashboard() {
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
-
-
 
                             <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-shadow">
                                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Flat Type Distribution</h2>
@@ -529,7 +460,7 @@ export default function HDBDashboard() {
                             </div>
                         </div>
 
-                        {/* Add Town Modal - place this at the end of your component, before closing div */}
+                        {/* Add Town Modal */}
                         {showAddTownModal && (
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                                 <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
@@ -581,7 +512,7 @@ export default function HDBDashboard() {
                         <div className="grid lg:grid-cols-2 gap-8">
                             <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-shadow">
                                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Top Performing Blocks</h2>
-                                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                                <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2">
                                     {topBlocks.length > 0 ? topBlocks.map((block, index) => (
                                         <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                                             <div className="flex items-center space-x-3">
@@ -606,30 +537,41 @@ export default function HDBDashboard() {
 
                             <div className="bg-white border-2 border-gray-200 rounded-2xl p-8 hover:shadow-xl transition-shadow">
                                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Lease Remaining Analysis</h2>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={leaseAnalysis}>
+                                <ResponsiveContainer width="100%" height={450}>
+                                    <BarChart
+                                        data={leaseAnalysis}
+                                        margin={{ top: 10, right: 30, left: 20, bottom: 10 }}
+                                    >
                                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                                         <XAxis
                                             dataKey="range"
                                             stroke="#6b7280"
                                             angle={-15}
                                             textAnchor="end"
-                                            height={80}
+                                            height={50}
                                             interval={0}
                                             tick={{ fontSize: 12 }}
                                         />
-                                        <YAxis stroke="#6b7280" tickFormatter={formatCurrency} />
+                                        <YAxis
+                                            stroke="#6b7280"
+                                            tickFormatter={formatCurrency}
+                                            domain={[0, 1600000]}
+                                            ticks={[0, 200000, 400000, 600000, 800000, 1000000, 1200000, 1400000, 1600000]} // manual ticks every 200k
+                                        />
                                         <Tooltip
-                                            formatter={(value) => [`$${formatNumber(value)}`, 'Avg Price']}
+                                            formatter={(value) => [`${formatNumber(value)}`, 'Avg Price']}
                                             contentStyle={{ borderRadius: '12px', border: '2px solid #e5e7eb' }}
                                         />
                                         <Bar dataKey="avgPrice" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
+
                             </div>
                         </div>
                     </>
                 )}
+                {/* Price Prediction Section */}
+                <PricePredictionSection />
             </div>
         </div>
     );

@@ -175,17 +175,27 @@ async function createTables() {
     await client.query(`
       CREATE TABLE price_prediction (
         prediction_id SERIAL PRIMARY KEY,
-        flat_id INT NOT NULL REFERENCES hdbflat(flat_id),
-        as_of_date DATE NOT NULL,
-        predicted_price DECIMAL(12, 2),
-        model_version VARCHAR(50),
-        features TEXT,
-        error_margin DECIMAL(10, 2),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        town_id INT REFERENCES town(town_id),
+        flat_type VARCHAR(50) NOT NULL,
+        prediction_year INT NOT NULL,
+        prediction_month INT NOT NULL,
+        predicted_price DECIMAL(12, 2) NOT NULL,
+        confidence_lower DECIMAL(12, 2),
+        confidence_upper DECIMAL(12, 2),
+        base_price DECIMAL(12, 2),
+        yoy_growth_rate DECIMAL(5, 2),
+        model_version VARCHAR(50) DEFAULT 'linear_trend_v1',
+        features JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(town_id, flat_type, prediction_year, prediction_month)
       )
     `);
-    await client.query('CREATE INDEX idx_prediction_flat ON price_prediction(flat_id)');
-    await client.query('CREATE INDEX idx_prediction_date ON price_prediction(as_of_date)');
+    await client.query('CREATE INDEX idx_prediction_town_type ON price_prediction(town_id, flat_type)');
+    await client.query('CREATE INDEX idx_prediction_year ON price_prediction(prediction_year)');
+    await client.query('CREATE INDEX idx_prediction_date ON price_prediction(prediction_year, prediction_month)');
+
+    // Make town_id nullable for price_prediction
+    await client.query('ALTER TABLE price_prediction ALTER COLUMN town_id DROP NOT NULL;');
     
     // Create WATCHLIST table
     console.log('   Creating watchlist table...');
