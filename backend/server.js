@@ -195,6 +195,39 @@ app.get('/api/mongodb-collection/:collectionName', async (req, res) => {
   }
 });
 
+// ============================================
+// AUTO-CLEANUP EXPIRED UNVERIFIED USERS
+// ============================================
+async function cleanupExpiredUsers() {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+
+  try {
+    const result = await pool.query(
+      `DELETE FROM "user" 
+       WHERE email_verified = FALSE 
+       AND verification_code_expires < NOW()`
+    );
+    
+    if (result.rowCount > 0) {
+      console.log(`🧹 Cleaned up ${result.rowCount} expired unverified user(s)`);
+    }
+  } catch (error) {
+    console.error('❌ Error cleaning up expired users:', error);
+  } finally {
+    await pool.end();
+  }
+}
+
+// Run cleanup every 5 minutes
+setInterval(cleanupExpiredUsers, 5 * 60 * 1000);
+
+// Run cleanup on server start
+cleanupExpiredUsers();
+
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 

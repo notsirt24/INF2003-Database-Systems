@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import VerifyEmail from './pages/VerifyEmail';
 import Watchlist from './pages/WatchList';
 import InteractiveMap from './pages/InteractiveMap';
 // import MapView from './pages/MapView';
@@ -29,7 +30,8 @@ function App() {
           {/* Auth Routes */}
           <Route path="/login" element={<Login />} /> {/* ADD THIS */}
           <Route path="/signup" element={<Signup />} /> {/* ADD THIS */}
-
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          
           {/* Uncomment these routes as you create the pages */}
           <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dashboard" element={ <ProtectedRoute> <Dashboard /> </ProtectedRoute> }/>

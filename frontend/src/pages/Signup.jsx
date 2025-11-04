@@ -60,25 +60,30 @@ export default function Signup() {
 
       const data = await response.json();
 
-      if (data.success) {
-        // Store token and user info
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-
-        window.dispatchEvent(new Event('userChanged'));
-        
-        // Redirect to dashboard
-        navigate('/dashboard');
-      } else {
-        setError(data.message || 'Signup failed');
-      }
+        if (data.success) {
+            // Check if verification is required
+            if (data.requiresVerification) {
+                // Redirect to verification page with email
+                navigate('/verify-email', { 
+                    state: { email: data.email }
+                });
+            } else {
+                // Old flow (shouldn't happen with new backend)
+                sessionStorage.setItem('token', data.token);
+                sessionStorage.setItem('user', JSON.stringify(data.user));
+                window.dispatchEvent(new Event('userChanged'));
+                navigate('/dashboard');
+            }
+        } else {
+            setError(data.message || 'Signup failed');
+        }
     } catch (err) {
-      console.error('Signup error:', err);
-      setError('Network error. Please try again.');
+        console.error('Signup error:', err);
+        setError('Network error. Please try again.');
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
   // Password strength indicator
   const getPasswordStrength = () => {
@@ -136,7 +141,7 @@ export default function Signup() {
                   onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                  placeholder="John Doe"
+                  placeholder="Enter your name"
                 />
               </div>
             </div>
@@ -156,7 +161,7 @@ export default function Signup() {
                   onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                  placeholder="you@example.com"
+                  placeholder="Enter your email"
                 />
               </div>
             </div>
