@@ -56,6 +56,10 @@ app.get('/api/test-postgres', async (req, res) => {
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
   });
+
+    pool.on('connect', (client) => {
+    client.query("SET timezone = 'Asia/Singapore'");
+  });
   
   try {
     const result = await pool.query(`
