@@ -11,6 +11,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleChange = (e) => {
     setFormData({
@@ -37,18 +38,31 @@ export default function Login() {
       const data = await response.json();
 
       if (data.success) {
+        const storage = rememberMe ? localStorage : sessionStorage;
         // Store token and user info in localStorage
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        storage.setItem('token', data.token);
+        storage.setItem('user', JSON.stringify(data.user));
         
-        // ADD THIS LINE - dispatches event to update Navigation
+        // dispatches event to update Navigation
         window.dispatchEvent(new Event('userChanged'));
 
         // Redirect to dashboard
         navigate('/dashboard');
-      } else {
-        setError(data.message || 'Login failed');
-      }
+
+        } else {
+            // Check if user needs to verify email
+            if (data.requiresVerification) {
+                setError(data.message);
+                // Redirect to verification page after 2 seconds
+                setTimeout(() => {
+                    navigate('/verify-email', { 
+                        state: { email: data.email }
+                    });
+                }, 2000);
+            } else {
+                setError(data.message || 'Login failed');
+            }
+        }
     } catch (err) {
       console.error('Login error:', err);
       setError('Network error. Please try again.');
@@ -102,7 +116,7 @@ export default function Login() {
                   onChange={handleChange}
                   required
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition"
-                  placeholder="you@example.com"
+                  placeholder="Enter your email"
                 />
               </div>
             </div>
@@ -138,8 +152,10 @@ export default function Login() {
             <div className="flex items-center justify-between">
               <label className="flex items-center">
                 <input
-                  type="checkbox"
-                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="ml-2 text-sm text-gray-600">Remember me</span>
               </label>

@@ -19,7 +19,7 @@ export default function Navigation() {
 
     useEffect(() => {
         const loadUser = () => {
-            const userData = localStorage.getItem('user');
+            const userData = sessionStorage.getItem('user')|| localStorage.getItem('user');
             if (userData) {
                 setUser(JSON.parse(userData));
             } else {
@@ -36,8 +36,11 @@ export default function Navigation() {
     }, []);
 
     const handleLogout = () => {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        
         setUser(null);
         window.dispatchEvent(new Event('userChanged'));
         navigate('/login');

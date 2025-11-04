@@ -50,8 +50,8 @@ async function createTables() {
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_login_at TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Singapore'),
+        last_login_at TIMESTAMPTZ
       )
     `);
     await client.query('CREATE INDEX idx_user_email ON "user"(email)');
