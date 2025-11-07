@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, TrendingUp, Map, Bookmark, Menu, X, Building2, Cloud, Book, LogOut } from 'lucide-react';
+import ProfileDropdown from './ProfileDropdown';
 
 export default function Navigation() {
     const navigate = useNavigate();
@@ -70,32 +71,24 @@ export default function Navigation() {
                             );
                         })}
                     </div>
-                    <div className="hidden md:flex items-center space-x-4">
+                    <div className="hidden md:flex items-center">
                         {user ? (
-                            <div className="flex items-center space-x-3">
-                                <div className="text-right">
-                                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                                    <p className="text-xs text-gray-500">{user.email}</p>
-                                </div>
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-full flex items-center justify-center">
-                                    <span className="text-white font-semibold text-sm">{user.name?.charAt(0).toUpperCase()}</span>
-                                </div>
-                                <button onClick={handleLogout} className="flex items-center space-x-1 px-4 py-2 text-sm font-medium text-gray-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                                    <LogOut className="w-4 h-4" />
-                                    <span>Logout</span>
-                                </button>
-                            </div>
+                            <ProfileDropdown user={user} onLogout={handleLogout} />
                         ) : (
                             <a href="/login" className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-blue-500/50 transition-all duration-300">
                                 Sign In
                             </a>
                         )}
                     </div>
+
+                    {/* Mobile Menu Button */}
                     <button className="md:hidden p-2 rounded-lg hover:bg-gray-100" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
                         {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                     </button>
                 </div>
             </div>
+
+            {/* Mobile Menu */}
             {mobileMenuOpen && (
                 <div className="md:hidden bg-white border-t border-gray-200">
                     <div className="px-6 py-4 space-y-2">
@@ -110,11 +103,21 @@ export default function Navigation() {
                             );
                         })}
                         {user && (
-                            <div className="pt-4 border-t border-gray-200">
-                                <div className="px-4 py-2 mb-2">
+                            <div className="pt-4 border-t border-gray-200 space-y-2">
+                                <div className="px-4 py-2">
                                     <p className="text-sm font-medium text-gray-900">{user.name}</p>
                                     <p className="text-xs text-gray-500">{user.email}</p>
                                 </div>
+                                <button
+                                    onClick={() => {
+                                        setMobileMenuOpen(false);
+                                        navigate('/change-password');
+                                    }}
+                                    className="flex items-center space-x-3 w-full px-4 py-3 rounded-lg text-gray-700 hover:bg-gray-100 font-medium"
+                                >
+                                    <Lock className="w-5 h-5" />
+                                    <span>Change Password</span>
+                                </button>
                                 <button onClick={handleLogout} className="flex items-center space-x-3 w-full px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 font-medium">
                                     <LogOut className="w-5 h-5" />
                                     <span>Logout</span>

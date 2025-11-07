@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
-const { generateVerificationCode, sendVerificationEmail } = require('../services/emailService');
+const { generateVerificationCode, generateResetToken, sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -472,6 +472,283 @@ router.get('/verify', async (req, res) => {
       success: false, 
       message: 'Invalid or expired token' 
     });
+  }
+});
+
+// ============================================
+// FORGOT PASSWORD - REQUEST RESET (UPDATED)
+// ============================================
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Please provide email address' 
+    });
+  }
+  
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Please provide a valid email address' 
+    });
+  }
+  
+  const client = await pool.connect();
+  
+  try {
+    // Find user
+    const result = await client.query(
+      'SELECT user_id, name, email, email_verified FROM "user" WHERE email = $1',
+      [email.toLowerCase()]
+    );
+    
+ if (result.rows.length === 0 || !result.rows[0].email_verified) {
+  // Don't reveal if email exists or not (more secure)
+  return res.json({
+    success: true,
+    message: 'If an account exists with this email, you will receive a password reset link.'
+  });
+}
+    
+    const user = result.rows[0];
+    
+    // Check if email is verified
+    if (!user.email_verified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please verify your email before resetting password. Check your inbox for the verification code.',
+        requiresVerification: true,
+        email: user.email
+      });
+    }
+    
+    // Generate reset token
+    const resetToken = generateResetToken();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    
+    // Save reset token
+    await client.query(
+      'UPDATE "user" SET reset_token = $1, reset_token_expires = $2 WHERE user_id = $3',
+      [resetToken, expiresAt, user.user_id]
+    );
+    
+    // Send reset email
+    try {
+      await sendPasswordResetEmail(user.email, user.name, resetToken);
+      console.log(`✅ Password reset email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error('❌ Email sending failed:', emailError);
+      console.log(`🔐 Reset token for ${email}: ${resetToken}`);
+      console.log(`🔗 Reset URL: ${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Password reset link sent to your email.',
+      // TEMPORARY for testing - remove in production!
+      resetToken: resetToken,
+      resetUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`
+    });
+    
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error. Please try again later.',
+      error: error.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================
+// RESET PASSWORD - VERIFY TOKEN & UPDATE
+// ============================================
+router.post('/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+  
+  if (!token || !newPassword) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Please provide reset token and new password' 
+    });
+  }
+  
+  if (newPassword.length < 6) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Password must be at least 6 characters long' 
+    });
+  }
+  
+  const client = await pool.connect();
+  
+  try {
+    // Find user with this token
+    const result = await client.query(
+      'SELECT user_id, name, email, reset_token_expires FROM "user" WHERE reset_token = $1',
+      [token]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid or expired reset token' 
+      });
+    }
+    
+    const user = result.rows[0];
+    
+    // Check if token expired
+    const now = new Date();
+    const expiresAt = new Date(user.reset_token_expires);
+    
+    if (now > expiresAt) {
+      // Clear expired token
+      await client.query(
+        'UPDATE "user" SET reset_token = NULL, reset_token_expires = NULL WHERE user_id = $1',
+        [user.user_id]
+      );
+      
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Reset token has expired. Please request a new one.',
+        expired: true
+      });
+    }
+    
+    // Hash new password
+    const saltRounds = 10;
+    const password_hash = await bcrypt.hash(newPassword, saltRounds);
+    
+    // Update password and clear reset token
+    await client.query(
+      `UPDATE "user" 
+       SET password_hash = $1, reset_token = NULL, reset_token_expires = NULL 
+       WHERE user_id = $2`,
+      [password_hash, user.user_id]
+    );
+    
+    res.json({
+      success: true,
+      message: 'Password reset successfully. You can now login with your new password.'
+    });
+    
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error',
+      error: error.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// ============================================
+// CHANGE PASSWORD (FOR LOGGED-IN USERS)
+// ============================================
+router.post('/change-password', async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ 
+      success: false, 
+      message: 'Not authenticated' 
+    });
+  }
+  
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Please provide current and new password' 
+    });
+  }
+  
+  if (newPassword.length < 6) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'New password must be at least 6 characters long' 
+    });
+  }
+  
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'New password must be different from current password' 
+    });
+  }
+  
+  const client = await pool.connect();
+  
+  try {
+    // Verify JWT token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Get user
+    const result = await client.query(
+      'SELECT user_id, email, password_hash FROM "user" WHERE user_id = $1',
+      [decoded.user_id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'User not found' 
+      });
+    }
+    
+    const user = result.rows[0];
+    
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+    
+    if (!isPasswordValid) {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Current password is incorrect' 
+      });
+    }
+    
+    // Hash new password
+    const saltRounds = 10;
+    const password_hash = await bcrypt.hash(newPassword, saltRounds);
+    
+    // Update password
+    await client.query(
+      'UPDATE "user" SET password_hash = $1 WHERE user_id = $2',
+      [password_hash, user.user_id]
+    );
+    
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+    
+  } catch (error) {
+    console.error('Change password error:', error);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        success: false, 
+        message: 'Invalid token' 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error',
+      error: error.message 
+    });
+  } finally {
+    client.release();
   }
 });
 

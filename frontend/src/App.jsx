@@ -1,13 +1,16 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
-import CheckDBConnection from './pages/CheckDBConnection'; // ADD THIS
+import CheckDBConnection from './pages/CheckDBConnection';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Import other pages as you create them
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import ChangePassword from './pages/ChangePassword';
 import VerifyEmail from './pages/VerifyEmail';
 import Watchlist from './pages/WatchList';
 import InteractiveMap from './pages/InteractiveMap';
@@ -28,13 +31,17 @@ function App() {
           <Route path="/check-db" element={<CheckDBConnection />} /> {/* ADD THIS */}
           
           {/* Auth Routes */}
-          <Route path="/login" element={<Login />} /> {/* ADD THIS */}
-          <Route path="/signup" element={<Signup />} /> {/* ADD THIS */}
+          <Route path="/login" element={<Login />} /> 
+          <Route path="/signup" element={<Signup />} /> 
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
           {/* Uncomment these routes as you create the pages */}
           <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dashboard" element={ <ProtectedRoute> <Dashboard /> </ProtectedRoute> }/>
+          <Route path="/change-password" element={ <ProtectedRoute><ChangePassword /></ProtectedRoute> } 
+          />
           <Route path="/map" element={<InteractiveMap />} />
           {/* <Route path="/login" element={<Login />} /> */}
           {/* <Route path="/register" element={<Register />} /> */}
