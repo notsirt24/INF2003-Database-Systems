@@ -14,6 +14,7 @@ import ChangePassword from './pages/ChangePassword';
 import VerifyEmail from './pages/VerifyEmail';
 import Watchlist from './pages/WatchList';
 import InteractiveMap from './pages/InteractiveMap';
+import Listings from './pages/Listings';
 // import MapView from './pages/MapView';
 // import Login from './pages/Login';
 // import Register from './pages/Register';
@@ -29,6 +30,9 @@ function App() {
           {/* Landing Page */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/check-db" element={<CheckDBConnection />} /> {/* ADD THIS */}
+          
+          {/* Listings Page */}
+          <Route path="/listings" element={<Listings />} />
           
           {/* Auth Routes */}
           <Route path="/login" element={<Login />} /> 

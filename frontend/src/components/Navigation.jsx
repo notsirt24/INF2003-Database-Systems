@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, TrendingUp, Map, Bookmark, Menu, X, Building2, Cloud, Book, LogOut } from 'lucide-react';
+import { Home, TrendingUp, Map, Bookmark, Menu, X, Building2, Cloud, Book, LogOut, List, Lock } from 'lucide-react';
 import ProfileDropdown from './ProfileDropdown';
 
 export default function Navigation() {
@@ -11,6 +11,7 @@ export default function Navigation() {
 
     const navItems = [
         { name: 'Home', icon: Home, path: '/' },
+        { name: 'Listings', icon: List, path: '/listings' },
         { name: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
         { name: 'Map', icon: Map, path: '/map' },
         { name: 'AI-Chatbot', icon: Cloud, path: '/chatbot' },
@@ -59,14 +60,14 @@ export default function Navigation() {
                             HDB Analytics
                         </span>
                     </a>
-                    <div className="hidden md:flex items-center space-x-1">
+                    <div className="hidden md:flex items-center space-x-0.5">
                         {navItems.map((item) => {
                             const Icon = item.icon;
                             const isActive = location.pathname === item.path;
                             return (
-                                <a key={item.name} href={item.path} className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isActive ? 'bg-blue-100 text-blue-600' : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'}`}>
+                                <a key={item.name} href={item.path} className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg transition-all duration-200 ${isActive ? 'bg-blue-100 text-blue-600' : 'text-gray-700 hover:bg-gray-100 hover:text-blue-600'}`}>
                                     <Icon className="w-4 h-4" />
-                                    <span className="font-medium">{item.name}</span>
+                                    <span className="font-medium text-sm">{item.name}</span>
                                 </a>
                             );
                         })}

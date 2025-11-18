@@ -53,7 +53,7 @@ function ListingCardMini({ property, onAddToWatchlist, onRemoveFromWatchlist, ac
   );
 }
 
-export default function ListOfListings() {
+export default function ListOfListings({ showHeader = true }) {
   const [listings, setListings] = useState([]);
   const [properties, setProperties] = useState([]); // user's saved props
   const [actionLoading, setActionLoading] = useState(false);
@@ -77,7 +77,7 @@ export default function ListOfListings() {
 
   useEffect(() => {
     (async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (!token) return; // not signed in
       try {
         const res = await fetch(`${API_URL}/watchlist`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -92,7 +92,7 @@ export default function ListOfListings() {
   }, []);
 
   const addToWatchlist = async (item) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) return alert('Please sign in to save to your watchlist');
     setActionLoading(true);
     try {
@@ -111,7 +111,7 @@ export default function ListOfListings() {
   };
 
   const removeFromWatchlist = async (flatId) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     if (!token) return alert('Please sign in to update your watchlist');
     setActionLoading(true);
     try {
@@ -191,12 +191,14 @@ export default function ListOfListings() {
   return (
     <section className="py-12 px-6 bg-white">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-3xl font-black text-gray-900">Explore Listings</h2>
-            <p className="text-sm text-gray-600 mt-1">Browse recent resale transactions — click the bookmark to save properties to your watchlist.</p>
+        {showHeader && (
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-3xl font-black text-gray-900">Explore Listings</h2>
+              <p className="text-sm text-gray-600 mt-1">Browse recent resale transactions — click the bookmark to save properties to your watchlist.</p>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pagedListings.map((l, i) => (

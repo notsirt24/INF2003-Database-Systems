@@ -162,8 +162,9 @@ export default function WatchList() {
       setLoading(true);
       setError(null);
 
-      const userRaw = localStorage.getItem('user');
-      const token = localStorage.getItem('token');
+      // Check both localStorage and sessionStorage for user data
+      const userRaw = localStorage.getItem('user') || sessionStorage.getItem('user');
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
       if (!userRaw) {
         setError('Not signed in. Please sign in to see your watchlist.');
@@ -209,7 +210,7 @@ export default function WatchList() {
     })();
   }, [mode]);
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
   // adding from explore removed — watchlist page only supports removal
 
