@@ -53,7 +53,7 @@ function ListingCardMini({ property, onAddToWatchlist, onRemoveFromWatchlist, ac
   );
 }
 
-export default function ListOfListings({ showHeader = true }) {
+export default function ListOfListings({ showHeader = true, searchTerm = '', filters = {}, sortBy = 'newest' }) {
   const [listings, setListings] = useState([]);
   const [properties, setProperties] = useState([]); // user's saved props
   const [actionLoading, setActionLoading] = useState(false);
@@ -64,7 +64,7 @@ export default function ListOfListings({ showHeader = true }) {
   useEffect(() => {
     (async () => {
       try {
-        const resp = await fetch(`${API_URL}/listings?limit=30`);
+        const resp = await fetch(`${API_URL}/listings?limit=100`); // Increased limit for better filtering
         if (!resp.ok) throw new Error(`Failed to load listings (${resp.status})`);
         const json = await resp.json();
         setListings(json.listings || []);
@@ -129,9 +129,49 @@ export default function ListOfListings({ showHeader = true }) {
     } finally { setActionLoading(false); }
   };
 
+  // Apply search and filters
+  const filteredListings = listings.filter(listing => {
+    // Search term filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (listing.town || '').toLowerCase().includes(searchLower) ||
+        (listing.block || listing.block_no || '').toString().toLowerCase().includes(searchLower) ||
+        (listing.street_name || '').toLowerCase().includes(searchLower);
+      if (!matchesSearch) return false;
+    }
+
+    // Town filter
+    if (filters.town && (listing.town || '').toUpperCase() !== filters.town.toUpperCase()) {
+      return false;
+    }
+
+    // Flat type filter
+    if (filters.flatType && (listing.flat_type || '').toUpperCase() !== filters.flatType.toUpperCase()) {
+      return false;
+    }
+
+    // Price range filters
+    const price = Number(listing.resale_price) || 0;
+    if (filters.priceMin && price < Number(filters.priceMin)) {
+      return false;
+    }
+    if (filters.priceMax && price > Number(filters.priceMax)) {
+      return false;
+    }
+
+    // Minimum lease filter
+    const lease = Number(listing.remaining_lease_years_at_sale) || 0;
+    if (filters.leaseMin && lease < Number(filters.leaseMin)) {
+      return false;
+    }
+
+    return true;
+  });
+
   // grouping logic (same as WatchList explore) -> produce representatives
   const groups = {};
-  for (const l of listings) {
+  for (const l of filteredListings) {
     const blk = (l.block || l.block_no || 'Unknown').toString();
     const street = (l.street_name || '').toString();
     const townName = (l.town || '').toString();
@@ -158,7 +198,55 @@ export default function ListOfListings({ showHeader = true }) {
     return { key: k, listing: annotated };
   });
 
-  const displayListings = groupEntries.map(g => g.listing);
+  let displayListings = groupEntries.map(g => g.listing);
+
+  // Apply sorting
+  displayListings.sort((a, b) => {
+    switch (sortBy) {
+      case 'newest':
+        const dateA = a.contract_date ? new Date(a.contract_date).getTime() : 0;
+        const dateB = b.contract_date ? new Date(b.contract_date).getTime() : 0;
+        return dateB - dateA;
+      
+      case 'oldest':
+        const dateA2 = a.contract_date ? new Date(a.contract_date).getTime() : 0;
+        const dateB2 = b.contract_date ? new Date(b.contract_date).getTime() : 0;
+        return dateA2 - dateB2;
+      
+      case 'price-low':
+        const priceA = Number(a.resale_price) || 0;
+        const priceB = Number(b.resale_price) || 0;
+        return priceA - priceB;
+      
+      case 'price-high':
+        const priceA2 = Number(a.resale_price) || 0;
+        const priceB2 = Number(b.resale_price) || 0;
+        return priceB2 - priceA2;
+      
+      case 'lease-high':
+        const leaseA = Number(a.remaining_lease_years_at_sale) || 0;
+        const leaseB = Number(b.remaining_lease_years_at_sale) || 0;
+        return leaseB - leaseA;
+      
+      case 'lease-low':
+        const leaseA2 = Number(a.remaining_lease_years_at_sale) || 0;
+        const leaseB2 = Number(b.remaining_lease_years_at_sale) || 0;
+        return leaseA2 - leaseB2;
+      
+      case 'area-large':
+        const areaA = Number(a.floor_area_sqm) || 0;
+        const areaB = Number(b.floor_area_sqm) || 0;
+        return areaB - areaA;
+      
+      case 'area-small':
+        const areaA2 = Number(a.floor_area_sqm) || 0;
+        const areaB2 = Number(b.floor_area_sqm) || 0;
+        return areaA2 - areaB2;
+      
+      default:
+        return 0;
+    }
+  });
   const savedSet = new Set((properties || []).map(p => p.flat_id));
 
   // responsive column count based on window width to match Tailwind breakpoints
@@ -184,6 +272,11 @@ export default function ListOfListings({ showHeader = true }) {
     if (currentPage > totalPages) setCurrentPage(1);
   }, [displayListings.length, totalPages]);
 
+  // Reset to first page when search term or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filters, sortBy]);
+
   const startIdx = (currentPage - 1) * itemsPerPage;
   const endIdx = startIdx + itemsPerPage;
   const pagedListings = displayListings.slice(startIdx, endIdx);
@@ -200,53 +293,71 @@ export default function ListOfListings({ showHeader = true }) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {pagedListings.map((l, i) => (
-            <ListingCardMini
-              key={l.flat_id || i}
-              property={l}
-              onAddToWatchlist={addToWatchlist}
-              onRemoveFromWatchlist={removeFromWatchlist}
-              actionLoading={actionLoading}
-              mode="explore"
-              isSaved={savedSet.has(l.flat_id)}
-            />
-          ))}
+        {/* Results count */}
+        <div className="mb-4 text-sm text-gray-600">
+          {displayListings.length === 0 ? (
+            'No listings found'
+          ) : (
+            `Showing ${displayListings.length} listing${displayListings.length === 1 ? '' : 's'}`
+          )}
         </div>
 
-        {/* Pagination controls */}
-        {totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-center space-x-3">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1 rounded-md border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
-            >
-              &lt;
-            </button>
-
-            {Array.from({ length: totalPages }).map((_, idx) => {
-              const page = idx + 1;
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  aria-current={currentPage === page}
-                  className={`px-3 py-1 rounded-md border ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
-                >
-                  {page}
-                </button>
-              );
-            })}
-
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1 rounded-md border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
-            >
-              &gt;
-            </button>
+        {displayListings.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <p className="text-gray-500 text-lg">No properties match your search criteria.</p>
+            <p className="text-gray-400 text-sm mt-2">Try adjusting your filters or search terms.</p>
           </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pagedListings.map((l, i) => (
+                <ListingCardMini
+                  key={l.flat_id || i}
+                  property={l}
+                  onAddToWatchlist={addToWatchlist}
+                  onRemoveFromWatchlist={removeFromWatchlist}
+                  actionLoading={actionLoading}
+                  mode="explore"
+                  isSaved={savedSet.has(l.flat_id)}
+                />
+              ))}
+            </div>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-center space-x-3">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1 rounded-md border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                >
+                  &lt;
+                </button>
+
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const page = idx + 1;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      aria-current={currentPage === page}
+                      className={`px-3 py-1 rounded-md border ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1 rounded-md border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                >
+                  &gt;
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>

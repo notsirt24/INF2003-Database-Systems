@@ -255,7 +255,7 @@ export default function WatchList() {
           <p className="text-lg font-medium">You don't have any saved properties yet.</p>
           <p className="mt-2">Find resale listings and add them to your watchlist.</p>
           <div className="mt-6 flex items-center justify-center">
-            <Link to="/" className="px-4 py-2 bg-blue-600 text-white rounded-lg">Browse Listings</Link>
+            <Link to="/listings" className="px-4 py-2 bg-blue-600 text-white rounded-lg">Browse Listings</Link>
           </div>
         </div>
       );
