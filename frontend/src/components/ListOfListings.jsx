@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 function ListingCardMini({ property, onAddToWatchlist, onRemoveFromWatchlist, actionLoading, mode = 'explore', isSaved = false }) {
-  const { town, block, street_name, flat_type, resale_price, block_min_price, block_max_price, merged_count } = property || {};
+  const { town, block, street_name, flat_type, resale_price, block_min_price, block_max_price, merged_count, floor_area_sqm, remaining_lease_years_at_sale } = property || {};
   const title = street_name ? `${block} ${street_name}` : `${block}`;
   let displayPrice = 'Price n/a';
   if (mode === 'explore' && merged_count > 1 && block_min_price != null && block_max_price != null) {
@@ -31,9 +31,33 @@ function ListingCardMini({ property, onAddToWatchlist, onRemoveFromWatchlist, ac
       <div className="p-3 flex flex-col flex-1">
         <div className="flex-1">
           <div className="mb-2">
-            <div className="text-sm text-gray-900 mb-1">{town || '-'} • {flat_type || '-'}</div>
+            <div className="text-sm text-gray-900 mb-1">{town || '-'}</div>
             <div className="text-lg font-bold text-gray-900 mb-1">{title}</div>
-            <div className="text-sm font-extrabold text-gray-900">{displayPrice}</div>
+            <div className="text-sm font-extrabold text-gray-900 mb-2">{displayPrice}</div>
+          </div>
+
+          <div className="flex flex-wrap gap-1 text-gray-500 text-xs mb-2">
+            <div className="inline-flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md">
+              <svg className="w-3 h-3 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M3 21h18M5 21V8l7-5 7 5v13" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 12h4v9h-4z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="truncate">{flat_type || '-'}</span>
+            </div>
+            <div className="inline-flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md">
+              <svg className="w-3 h-3 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M4 4h16v16H4z" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M4 4l16 16M20 4L4 20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="truncate">{floor_area_sqm ? `${Math.round(floor_area_sqm)} m²` : '0 m²'}</span>
+            </div>
+            <div className="inline-flex items-center space-x-1 bg-gray-50 px-2 py-1 rounded-md">
+              <svg className="w-3 h-3 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="9" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M12 7v5l3 3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="truncate">{remaining_lease_years_at_sale ? `${Math.round(remaining_lease_years_at_sale)} yrs` : '-'}</span>
+            </div>
           </div>
         </div>
 
@@ -175,8 +199,9 @@ export default function ListOfListings({ showHeader = true, searchTerm = '', fil
     const blk = (l.block || l.block_no || 'Unknown').toString();
     const street = (l.street_name || '').toString();
     const townName = (l.town || '').toString();
-    const key = `${blk}|||${street}|||${townName}`;
-    if (!groups[key]) groups[key] = { block: blk, street, townName, items: [] };
+    const flatType = (l.flat_type || '').toString();
+    const key = `${blk}|||${street}|||${townName}|||${flatType}`;
+    if (!groups[key]) groups[key] = { block: blk, street, townName, flatType, items: [] };
     groups[key].items.push(l);
   }
 

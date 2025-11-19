@@ -14,9 +14,9 @@ function ListingCard({ property, onAddToWatchlist, onRemoveFromWatchlist, onTogg
     console.debug('[ListingCard] both onAdd and onRemove provided for flat_id:', property && property.flat_id);
   }
 
-  // Show block-level min/max range only when we have merged multiple transactions for the address.
+  // Show block-level min/max range when we have merged multiple transactions for the address.
   let displayPrice = 'Price n/a';
-  if (mode === 'explore' && merged_count > 1 && block_min_price != null && block_max_price != null) {
+  if ((mode === 'explore' || mode === 'my') && merged_count > 1 && block_min_price != null && block_max_price != null) {
     displayPrice = `S$ ${Number(block_min_price).toLocaleString()} - S$ ${Number(block_max_price).toLocaleString()}`;
   } else if (resale_price) {
     displayPrice = `S$ ${Number(resale_price).toLocaleString()}`;
@@ -47,7 +47,7 @@ function ListingCard({ property, onAddToWatchlist, onRemoveFromWatchlist, onTogg
       <div className="p-4 flex flex-col flex-1">
         <div className="flex-1">
           <div className="mb-3">
-            <div className="text-sm text-gray-900 mb-1">{town || '-'} • {flat_type || '-'}</div>
+            <div className="text-sm text-gray-900 mb-1">{town || '-'}</div>
             <div className="text-lg font-bold text-gray-900 mb-1">{title}</div>
             {/* merged_count badge handled in image area; no inline debug text */}
             <div className="text-lg font-extrabold text-gray-900">{displayPrice}</div>
@@ -237,6 +237,7 @@ export default function WatchList() {
       setActionLoading(false);
     }
   };
+  
   // prepare content to render (avoid nested ternaries to prevent accidental double-render)
   let content = null;
 
