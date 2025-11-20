@@ -15,6 +15,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import Watchlist from './pages/WatchList';
 import InteractiveMap from './pages/InteractiveMap';
 import Listings from './pages/Listings';
+import Reviews from './pages/Reviews';
 // import MapView from './pages/MapView';
 // import Login from './pages/Login';
 // import Register from './pages/Register';
@@ -33,6 +34,7 @@ function App() {
           
           {/* Listings Page */}
           <Route path="/listings" element={<Listings />} />
+          <Route path="/reviews" element={<Reviews />} />
           
           {/* Auth Routes */}
           <Route path="/login" element={<Login />} /> 
