@@ -4,8 +4,8 @@ import axios from 'axios';
 import Navigation from '../components/Navigation';
 import './Reviews.css';
 
-// Use backend directly to avoid proxy confusion in development
-const API_BASE_URL = 'http://localhost:3001';
+// Use relative paths so CRA dev server proxy (configured in package.json) forwards to backend
+const API_BASE_URL = '';
 
 // Singapore regions and towns
 const REGIONS = {
@@ -90,7 +90,7 @@ export default function Reviews() {
                 if (!params[key]) delete params[key];
             });
 
-            const response = await axios.get(`${API_BASE_URL}/api/news`, { params });
+            const response = await axios.get(`/api/news`, { params });
             setArticles(response.data.data);
         } catch (err) {
             console.error('Error fetching articles:', err);
@@ -103,7 +103,7 @@ export default function Reviews() {
 
     const fetchStats = async () => {
         try {
-            const response = await axios.get(`${API_BASE_URL}/api/news/stats`);
+            const response = await axios.get(`/api/news/stats`);
             setStats(response.data.stats);
         } catch (err) {
             console.error('Error fetching stats:', err);
