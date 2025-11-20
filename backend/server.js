@@ -3,6 +3,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const { MongoClient } = require('mongodb');
 const cookieParser = require('cookie-parser'); // for auth
+const newsRoutes = require('./routes/newsRoutes');
 require('dotenv').config({ path: '../database/scripts/.env' });
 
 const app = express();
@@ -26,7 +27,7 @@ const mongoOptions = {
 };
 
 // ============================================
-// IMPORT DASHBOARD ROUTES
+// IMPORT ROUTES
 // ============================================
 const dashboardRoutes = require('./routes/dashboardRoutes');
 app.use('/api/dashboard', dashboardRoutes);
@@ -194,6 +195,8 @@ app.get('/api/mongodb-collection/:collectionName', async (req, res) => {
     }
   }
 });
+
+app.use('/api/news', newsRoutes);
 
 // ============================================
 // AUTO-CLEANUP EXPIRED UNVERIFIED USERS

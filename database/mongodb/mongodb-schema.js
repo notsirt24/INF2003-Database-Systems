@@ -428,6 +428,219 @@ async function insertSampleData() {
   console.log(`   ✅ Inserted ${sampleReviews.length} sample reviews`);
 }
 
+// SHINA -- NewsArticlesSchema
+
+const newsArticleSchema = new mongoose.Schema({
+  article_id: {
+    type: String,
+    required: true,
+    unique: true,
+    index: true
+  },
+  title: {
+    type: String,
+    required: true,
+    index: 'text'
+  },
+  description: {
+    type: String
+  },
+  content: {
+    type: String
+  },
+  url: {
+    type: String,
+    required: true,
+    unique: true
+  },
+  source: {
+    name: String,
+    url: String
+  },
+  author: String,
+  published_at: {
+    type: Date,
+    required: true,
+    index: true
+  },
+  // Location tagging
+  locations: [{
+    type: String,
+    index: true  // Towns like 'PUNGGOL', 'BISHAN', etc.
+  }],
+  // Category tagging
+  categories: [{
+    type: String,
+    enum: [
+      'infrastructure',
+      'mrt_expansion', 
+      'new_development',
+      'policy_change',
+      'market_trend',
+      'amenities',
+      'schools',
+      'town_planning',
+      'price_analysis',
+      'general'
+    ],
+    index: true
+  }],
+  // Sentiment analysis
+  sentiment: {
+    score: {
+      type: Number,
+      min: -1,
+      max: 1,
+      default: 0
+    },
+    label: {
+      type: String,
+      enum: ['positive', 'neutral', 'negative'],
+      default: 'neutral'
+    }
+  },
+  // Impact on property values
+  impact_assessment: {
+    predicted_impact: {
+      type: String,
+      enum: ['high_positive', 'moderate_positive', 'neutral', 'moderate_negative', 'high_negative'],
+      default: 'neutral'
+    },
+    affected_areas: [String],
+    timeframe: String  // e.g., "2025-2027", "Next 5 years"
+  },
+  // Metadata
+  image_url: String,
+  keywords: [String],
+  relevance_score: {
+    type: Number,
+    default: 0,
+    index: true
+  },
+  view_count: {
+    type: Number,
+    default: 0
+  },
+  is_active: {
+    type: Boolean,
+    default: true,
+    index: true
+  },
+  scraped_at: {
+    type: Date,
+    default: Date.now
+  },
+  last_updated: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: { createdAt: 'scraped_at', updatedAt: 'last_updated' }
+});
+
+// Indexes for efficient querying
+newsArticleSchema.index({ locations: 1, published_at: -1 });
+newsArticleSchema.index({ categories: 1, published_at: -1 });
+newsArticleSchema.index({ 'impact_assessment.predicted_impact': 1, published_at: -1 });
+newsArticleSchema.index({ relevance_score: -1, published_at: -1 });
+newsArticleSchema.index({ title: 'text', description: 'text', content: 'text' });
+
+// TTL index - auto-delete articles older than 2 years
+newsArticleSchema.index({ published_at: 1 }, { expireAfterSeconds: 63072000 });
+
+const NewsArticle = mongoose.model('NewsArticle', newsArticleSchema);
+
+// ============================================
+// SHINA -- Add sample news data
+// ============================================
+async function insertSampleNewsData() {
+  const sampleNews = [
+    {
+      article_id: 'cna-2024-punggol-mrt',
+      title: 'New Punggol Coast MRT Station to Open in 2025',
+      description: 'LTA announces the opening of Punggol Coast station on the North-East Line, improving connectivity for residents.',
+      content: 'The Land Transport Authority (LTA) has announced that Punggol Coast station will begin operations in Q2 2025...',
+      url: 'https://www.channelnewsasia.com/singapore/punggol-coast-mrt-2025',
+      source: {
+        name: 'CNA',
+        url: 'https://www.channelnewsasia.com'
+      },
+      published_at: new Date('2024-09-15'),
+      locations: ['PUNGGOL'],
+      categories: ['mrt_expansion', 'infrastructure'],
+      sentiment: {
+        score: 0.8,
+        label: 'positive'
+      },
+      impact_assessment: {
+        predicted_impact: 'high_positive',
+        affected_areas: ['PUNGGOL', 'SENGKANG'],
+        timeframe: '2025-2027'
+      },
+      relevance_score: 0.95,
+      keywords: ['MRT', 'Punggol', 'North-East Line', 'Transport']
+    },
+    {
+      article_id: 'st-2024-bishan-prices',
+      title: 'Bishan HDB Resale Prices Surge 12% Year-on-Year',
+      description: 'Strong demand for mature estates pushes Bishan resale prices to new highs in 2024.',
+      url: 'https://www.straitstimes.com/singapore/bishan-resale-prices-2024',
+      source: {
+        name: 'The Straits Times',
+        url: 'https://www.straitstimes.com'
+      },
+      published_at: new Date('2024-08-20'),
+      locations: ['BISHAN'],
+      categories: ['price_analysis', 'market_trend'],
+      sentiment: {
+        score: 0.6,
+        label: 'positive'
+      },
+      impact_assessment: {
+        predicted_impact: 'moderate_positive',
+        affected_areas: ['BISHAN', 'TOA PAYOH'],
+        timeframe: '2024-2025'
+      },
+      relevance_score: 0.88,
+      keywords: ['Bishan', 'Resale Prices', 'HDB', 'Market Trend']
+    },
+    {
+      article_id: 'bt-2024-tengah-development',
+      title: 'Tengah: Singapore\'s First Smart and Sustainable Town',
+      description: 'HDB unveils plans for Tengah, featuring car-free town centres and extensive green spaces.',
+      url: 'https://www.businesstimes.com.sg/property/tengah-smart-town',
+      source: {
+        name: 'Business Times',
+        url: 'https://www.businesstimes.com.sg'
+      },
+      published_at: new Date('2024-07-10'),
+      locations: ['TENGAH'],
+      categories: ['new_development', 'town_planning'],
+      sentiment: {
+        score: 0.9,
+        label: 'positive'
+      },
+      impact_assessment: {
+        predicted_impact: 'high_positive',
+        affected_areas: ['TENGAH', 'JURONG WEST', 'CHOA CHU KANG'],
+        timeframe: '2024-2030'
+      },
+      relevance_score: 0.92,
+      keywords: ['Tengah', 'Smart Town', 'Sustainable', 'HDB']
+    }
+  ];
+
+  for (const article of sampleNews) {
+    await NewsArticle.findOneAndUpdate(
+      { article_id: article.article_id },
+      article,
+      { upsert: true, new: true }
+    );
+  }
+  
+  console.log(`   ✅ Inserted ${sampleNews.length} sample news articles`);
+}
+
 // ============================================
 // Export
 // ============================================
@@ -438,7 +651,9 @@ module.exports = {
   PricePrediction,
   UserActivity,
   MarketAnalytics,
-  Notification
+  Notification,
+  NewsArticle,
+  insertSampleNewsData
 };
 
 // ============================================
