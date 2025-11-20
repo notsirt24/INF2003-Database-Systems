@@ -93,7 +93,8 @@ export default function Reviews() {
             setArticles(response.data.data);
         } catch (err) {
             console.error('Error fetching articles:', err);
-            setError('Failed to load articles. Please try again.');
+            const serverMessage = err.response?.data?.message || err.response?.data?.error || err.message;
+            setError(`Failed to load articles: ${serverMessage}`);
         } finally {
             setLoading(false);
         }
