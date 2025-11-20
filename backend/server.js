@@ -46,6 +46,9 @@ app.use('/api', watchlistRoutes);
 const mapRoutes = require('./routes/mapRoutes');
 app.use('/api/map', mapRoutes);
 
+const chatbotRoutes = require('./routes/chatbotRoutes');
+app.use('/api/chatbot', chatbotRoutes);
+
 // ============================================
 // TEST ENDPOINTS (Optional - for debugging)
 // ============================================
@@ -249,5 +252,6 @@ app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📊 Dashboard API: http://localhost:${PORT}/api/dashboard`);
   console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
+  console.log(`🤖 Chatbot API: http://localhost:${PORT}/api/chatbot`);
   console.log(`🔍 Test endpoints available at /api/test-postgres and /api/test-mongodb`);
 });
