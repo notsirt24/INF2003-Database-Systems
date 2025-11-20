@@ -38,17 +38,23 @@ reddit = praw.Reddit(
 )
 
 # Subreddits - Only discussion-focused ones
-SUBREDDITS = ['askSingapore', 'singaporefi']
+SUBREDDITS = ['askSingapore', 'singaporefi', 'singapore']
 
-# Singapore towns
-SINGAPORE_TOWNS = [
-    'BISHAN', 'BUKIT MERAH', 'BUKIT TIMAH', 'GEYLANG', 'KALLANG',
-    'MARINE PARADE', 'QUEENSTOWN', 'TOA PAYOH', 'ANG MO KIO', 
-    'SEMBAWANG', 'WOODLANDS', 'YISHUN', 'HOUGANG', 'PUNGGOL', 
-    'SENGKANG', 'SERANGOON', 'BEDOK', 'PASIR RIS', 'TAMPINES',
-    'BUKIT BATOK', 'BUKIT PANJANG', 'CHOA CHU KANG', 'CLEMENTI',
-    'JURONG EAST', 'JURONG WEST', 'TENGAH'
-]
+# Singapore regions and towns - MATCHES FRONTEND STRUCTURE
+REGIONS = {
+    'Central': ['BISHAN', 'BUKIT MERAH', 'BUKIT TIMAH', 'CENTRAL AREA', 'GEYLANG', 'KALLANG', 'MARINE PARADE', 'QUEENSTOWN', 'TOA PAYOH'],
+    'North': ['ANG MO KIO', 'SEMBAWANG', 'WOODLANDS', 'YISHUN'],
+    'North-East': ['HOUGANG', 'PUNGGOL', 'SENGKANG', 'SERANGOON'],
+    'East': ['BEDOK', 'PASIR RIS', 'TAMPINES'],
+    'West': ['BUKIT BATOK', 'BUKIT PANJANG', 'CHOA CHU KANG', 'CLEMENTI', 'JURONG EAST', 'JURONG WEST'],
+    'North-West': ['LIM CHU KANG', 'SEMBAWANG', 'WOODLANDS', 'ADMIRALTY']
+}
+
+# Flatten to single list for backward compatibility
+SINGAPORE_TOWNS = []
+for region_towns in REGIONS.values():
+    SINGAPORE_TOWNS.extend(region_towns)
+SINGAPORE_TOWNS = list(set(SINGAPORE_TOWNS))  # Remove duplicates
 
 # ⚠️ STRICT BLACKLIST - Much more comprehensive
 BLACKLIST_KEYWORDS = [
@@ -98,11 +104,15 @@ REQUIRED_PHRASES = [
 ]
 
 def is_quality_review(title, selftext):
-    """STRICT quality check"""
+    """STRICT quality check with enhanced filtering"""
     full_text = f"{title} {selftext}".lower()
     
     # Skip if too short
     if len(full_text) < 150:
+        return False
+    
+    # Skip if too long (likely copy-paste from articles)
+    if len(full_text) > 10000:
         return False
     
     # Must have Singapore town
@@ -120,7 +130,11 @@ def is_quality_review(title, selftext):
         if keyword in full_text:
             return False
     
-    return True
+    # Prefer posts with personal experience markers
+    experience_markers = ['i live', 'i stayed', 'we live', 'been living', 'moved', 'grew up', 'living here', 'staying here']
+    has_personal = any(marker in full_text for marker in experience_markers)
+    
+    return True if has_personal else len(full_text) > 300  # Require longer posts without personal markers
 
 def clean_text(text):
     if not text:
@@ -194,29 +208,45 @@ def scrape_reddit():
     processed = set()
     skipped = 0
     
-    # ✅ BETTER SEARCH QUERIES - More specific
-    search_queries = [
-        # Direct living questions
-        'living in Punggol',
-        'living in Sengkang', 
-        'living in Bishan',
-        'living in Tampines',
-        'living in Woodlands',
+    # ✅ REGION-TARGETED SEARCH QUERIES - Enhanced for better results
+    search_queries = []
+    
+    # Generate queries for each region
+    for region, towns in REGIONS.items():
+        # Living in queries for top towns
+        for town in towns[:3]:
+            search_queries.append(f'living in {town}')
+            search_queries.append(f'is {town} worth it')
+            search_queries.append(f'thinking of moving to {town}')
         
-        # Comparisons
+        # Comparisons within region
+        if len(towns) >= 2:
+            search_queries.append(f'{towns[0]} vs {towns[1]}')
+        if len(towns) >= 3:
+            search_queries.append(f'{towns[1]} vs {towns[2]}')
+    
+    # Add cross-region comparisons
+    search_queries.extend([
         'Punggol vs Sengkang',
         'Bishan vs Toa Payoh',
         'Tampines vs Bedok',
-        
-        # General housing
-        'best HDB estate',
-        'recommend HDB area',
-        'HDB resale advice',
-        'BTO location advice',
-        'which town better',
-        'mature estate worth it',
-        'new estate pros cons'
-    ]
+        'East vs North-East HDB',
+        'mature vs new estate',
+        'which town has best MRT',
+        'cheapest HDB area',
+    ])
+    
+    # Add general experience queries
+    search_queries.extend([
+        'HDB living experience',
+        'HDB flat review',
+        'BTO or resale',
+        'HDB amenities worth it',
+        'HDB neighborhood review',
+        'HDB transport access',
+        'family friendly HDB area',
+        'young professionals HDB'
+    ])
     
     try:
         for subreddit_name in SUBREDDITS:
@@ -269,12 +299,20 @@ def scrape_reddit():
                             
                             sentiment_label = 'positive' if compound >= 0.1 else ('negative' if compound <= -0.1 else 'neutral')
                             
-                            # Create review
+                            # Determine region for this review
+                            region = None
+                            for reg, towns_in_region in REGIONS.items():
+                                if any(town in towns for town in towns_in_region):
+                                    region = reg
+                                    break
+                            
+                            # Create review with enhanced metadata
                             review = {
                                 'review_id': f"reddit-{submission.id}",
                                 'user_id': str(submission.author) if submission.author else 'deleted',
                                 'username': str(submission.author) if submission.author else '[deleted]',
                                 'locations': towns,
+                                'region': region,  # Add region for easier filtering
                                 'rating': rating,
                                 'title': post_title,
                                 'body': post_content,
@@ -294,7 +332,8 @@ def scrape_reddit():
                                 },
                                 'created_at': post_datetime,
                                 'scraped_at': datetime.now(),
-                                'is_active': True
+                                'is_active': True,
+                                'quality_score': round((len(pros) + len(cons)) / 2 + abs(compound), 2)  # Score for ranking
                             }
                             
                             reviews.append(review)
