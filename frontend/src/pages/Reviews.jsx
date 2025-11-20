@@ -4,6 +4,7 @@ import axios from 'axios';
 import Navigation from '../components/Navigation';
 import './Reviews.css';
 
+// Use backend directly to avoid proxy confusion in development
 const API_BASE_URL = 'http://localhost:3001';
 
 // Singapore regions and towns
