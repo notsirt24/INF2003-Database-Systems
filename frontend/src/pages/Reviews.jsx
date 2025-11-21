@@ -18,50 +18,84 @@ const REGIONS = {
 };
 
 export default function Reviews() {
+    // Tab state
+    const [activeTab, setActiveTab] = useState('news'); // 'news' or 'community'
+
+    // News articles state
     const [articles, setArticles] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [stats, setStats] = useState(null);
     const [expandedArticle, setExpandedArticle] = useState(null);
+
+    // Lemon8 reviews state
+    const [lemon8Reviews, setLemon8Reviews] = useState([]);
+    const [lemon8Loading, setLemon8Loading] = useState(false);
+    const [lemon8Error, setLemon8Error] = useState(null);
+    const [expandedReview, setExpandedReview] = useState(null);
+
+    // Shared filter state
     const [selectedRegion, setSelectedRegion] = useState('All');
     const [selectedTown, setSelectedTown] = useState('');
-    
+
     const [filters, setFilters] = useState({
         sourceType: '',
         category: '',
         search: ''
     });
 
-    // Sentiment columns
+    // Sentiment columns for news
     const [positiveArticles, setPositiveArticles] = useState([]);
     const [neutralArticles, setNeutralArticles] = useState([]);
     const [negativeArticles, setNegativeArticles] = useState([]);
 
+    // Sentiment columns for Lemon8
+    const [positiveLemon8, setPositiveLemon8] = useState([]);
+    const [neutralLemon8, setNeutralLemon8] = useState([]);
+    const [negativeLemon8, setNegativeLemon8] = useState([]);
+
     const [sortBy, setSortBy] = useState('published_at');
     const [sortOrder, setSortOrder] = useState('desc');
 
+    // Fetch news articles
     useEffect(() => {
-        fetchArticles();
-    }, [sortBy, sortOrder]);
+        if (activeTab === 'news') {
+            fetchArticles();
+        }
+    }, [sortBy, sortOrder, filters, selectedRegion, selectedTown, activeTab]);
 
+    // Fetch Lemon8 reviews
     useEffect(() => {
-        fetchArticles();
-    }, [filters, selectedRegion, selectedTown]);
+        if (activeTab === 'community') {
+            fetchLemon8Reviews();
+        }
+    }, [filters.search, selectedRegion, selectedTown, activeTab]);
 
     useEffect(() => {
         fetchStats();
     }, []);
 
-    // Categorize articles by sentiment
+    // Categorize news articles by sentiment
     useEffect(() => {
         const positive = articles.filter(a => a.sentiment.label === 'positive');
         const neutral = articles.filter(a => a.sentiment.label === 'neutral');
         const negative = articles.filter(a => a.sentiment.label === 'negative');
-        
+
         setPositiveArticles(positive);
         setNeutralArticles(neutral);
         setNegativeArticles(negative);
     }, [articles]);
+
+    // Categorize Lemon8 reviews by sentiment
+    useEffect(() => {
+        const positive = lemon8Reviews.filter(r => r.sentiment === 'positive');
+        const neutral = lemon8Reviews.filter(r => r.sentiment === 'neutral');
+        const negative = lemon8Reviews.filter(r => r.sentiment === 'negative');
+
+        setPositiveLemon8(positive);
+        setNeutralLemon8(neutral);
+        setNegativeLemon8(negative);
+    }, [lemon8Reviews]);
 
     const fetchArticles = async () => {
         setLoading(true);
@@ -71,7 +105,7 @@ export default function Reviews() {
             const params = {
                 sortBy,
                 order: sortOrder,
-                limit: 100, // Get more articles for Kanban
+                limit: 100,
                 ...filters
             };
 
@@ -79,10 +113,9 @@ export default function Reviews() {
             if (selectedTown) {
                 params.location = selectedTown;
             } else if (selectedRegion !== 'All') {
-                // Filter by any town in the region (backend will need to handle multiple locations)
                 const towns = REGIONS[selectedRegion];
                 if (towns && towns.length > 0) {
-                    params.location = towns[0]; // For now, just use first town
+                    params.location = towns[0];
                 }
             }
 
@@ -98,6 +131,45 @@ export default function Reviews() {
             setError(`Failed to load articles: ${serverMessage}`);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchLemon8Reviews = async () => {
+        setLemon8Loading(true);
+        setLemon8Error(null);
+
+        try {
+            const params = {
+                limit: 100
+            };
+
+            // Add location filter
+            if (selectedTown) {
+                params.estate = selectedTown;
+            } else if (selectedRegion !== 'All') {
+                const towns = REGIONS[selectedRegion];
+                if (towns && towns.length > 0) {
+                    params.estate = towns[0];
+                }
+            }
+
+            // Add search filter
+            if (filters.search) {
+                params.search = filters.search;
+            }
+
+            Object.keys(params).forEach(key => {
+                if (!params[key]) delete params[key];
+            });
+
+            const response = await axios.get(`/api/reviews/lemon8`, { params });
+            setLemon8Reviews(response.data.data || []);
+        } catch (err) {
+            console.error('Error fetching Lemon8 reviews:', err);
+            const serverMessage = err.response?.data?.message || err.response?.data?.error || err.message;
+            setLemon8Error(`Failed to load reviews: ${serverMessage}`);
+        } finally {
+            setLemon8Loading(false);
         }
     };
 
@@ -128,6 +200,10 @@ export default function Reviews() {
         setExpandedArticle(expandedArticle === articleId ? null : articleId);
     };
 
+    const toggleExpandedReview = (reviewId) => {
+        setExpandedReview(expandedReview === reviewId ? null : reviewId);
+    };
+
     const getSourceColor = (sourceType) => {
         switch (sourceType) {
             case 'government': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -147,10 +223,10 @@ export default function Reviews() {
 
     const getUniqueCategories = (categories) => {
         if (!categories || categories.length === 0) return [];
-        
+
         const uniqueCategories = [];
         const seenIcons = new Set();
-        
+
         for (const cat of categories) {
             const icon = getCategoryIcon(cat);
             if (!seenIcons.has(icon)) {
@@ -158,7 +234,7 @@ export default function Reviews() {
                 seenIcons.add(icon);
             }
         }
-        
+
         return uniqueCategories;
     };
 
@@ -168,10 +244,9 @@ export default function Reviews() {
             'neutral': { emoji: '😐', color: 'bg-gray-50 border-gray-200 text-gray-700', label: 'Neutral' },
             'negative': { emoji: '😞', color: 'bg-red-50 border-red-200 text-red-700', label: 'Negative' }
         };
-        return sentimentConfig[sentiment?.label] || sentimentConfig['neutral'];
+        return sentimentConfig[sentiment?.label || sentiment] || sentimentConfig['neutral'];
     };
 
-    // Mock area ratings (you can fetch this from your backend later)
     const getAreaRating = (region) => {
         const ratings = {
             'Central': { rating: 4.5, reviews: 1247, trend: 'up', avgPrice: '650k' },
@@ -186,7 +261,7 @@ export default function Reviews() {
 
     const renderArticleCard = (article) => {
         const isExpanded = expandedArticle === article.article_id;
-        
+
         return (
             <div
                 key={article.article_id}
@@ -291,291 +366,629 @@ export default function Reviews() {
                             </>
                         )}
                     </button>
+
                     <a
-                        href={article.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                    href={article.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-xs text-gray-600 hover:text-gray-800 flex items-center gap-1"
                     >
-                        <ExternalLink className="w-3 h-3" />
-                    </a>
-                </div>
+                    <ExternalLink className="w-3 h-3" />
+                </a>
             </div>
+            </div>
+        );
+};
+
+const renderLemon8Card = (review) => {
+    const isExpanded = expandedReview === review._id;
+
+    return (
+        <div
+            key={review._id}
+            className="bg-white border-2 border-gray-200 rounded-xl p-4 hover:shadow-lg transition-all mb-3 cursor-pointer"
+            onClick={() => toggleExpandedReview(review._id)}
+        >
+            {/* Source Badge */}
+            <div className="flex items-center justify-between mb-3">
+                <span className="px-2 py-1 rounded-lg text-xs font-semibold border bg-yellow-100 text-yellow-700 border-yellow-200">
+                    🍋 Lemon8
+                </span>
+                <span className="text-xs text-gray-500">
+                    @{review.account_handle}
+                </span>
+            </div>
+
+            {/* Title */}
+            <h4 className="text-sm font-bold text-gray-900 mb-2 line-clamp-2">
+                {review.title}
+            </h4>
+
+            {/* Sentiment Badge */}
+            <div className="flex items-center gap-2 mb-2">
+                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold border ${getSentimentDisplay(review.sentiment).color}`}>
+                    <span>{getSentimentDisplay(review.sentiment).emoji}</span>
+                    <span className="capitalize">{review.sentiment}</span>
+                </span>
+                {review.ai_confidence && (
+                    <span className="text-xs text-gray-500">
+                        {Math.round(review.ai_confidence * 100)}% confident
+                    </span>
+                )}
+            </div>
+
+            {/* Preview */}
+            {!isExpanded && (
+                <p className="text-xs text-gray-600 mb-3 line-clamp-3">
+                    {review.content}
+                </p>
+            )}
+
+            {/* Expanded Content */}
+            {isExpanded && (
+                <>
+                    <p className="text-xs text-gray-700 mb-3 leading-relaxed">
+                        {review.full_text || review.content}
+                    </p>
+
+                    {/* Key Points */}
+                    {review.key_points && review.key_points.length > 0 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                            <p className="text-xs font-bold text-blue-900 mb-2">Key Points:</p>
+                            <ul className="text-xs text-blue-800 space-y-1">
+                                {review.key_points.map((point, idx) => (
+                                    <li key={idx}>• {point}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Amenities Mentioned */}
+            {review.amenities_mentioned && Object.values(review.amenities_mentioned).some(arr => arr && arr.length > 0) && (
+                <div className="mb-3">
+                    <p className="text-xs font-semibold text-gray-700 mb-2">Amenities Mentioned:</p>
+                    <div className="flex flex-wrap gap-1">
+                        {review.amenities_mentioned.transport?.slice(0, 3).map((amenity, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs flex items-center gap-1">
+                                🚇 {amenity}
+                            </span>
+                        ))}
+                        {review.amenities_mentioned.shopping?.slice(0, 3).map((amenity, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs flex items-center gap-1">
+                                🛍️ {amenity}
+                            </span>
+                        ))}
+                        {review.amenities_mentioned.food?.slice(0, 3).map((amenity, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-orange-50 text-orange-700 rounded text-xs flex items-center gap-1">
+                                🍴 {amenity}
+                            </span>
+                        ))}
+                        {review.amenities_mentioned.recreation?.slice(0, 3).map((amenity, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-green-50 text-green-700 rounded text-xs flex items-center gap-1">
+                                🏃 {amenity}
+                            </span>
+                        ))}
+                        {review.amenities_mentioned.education?.slice(0, 3).map((amenity, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs flex items-center gap-1">
+                                🏫 {amenity}
+                            </span>
+                        ))}
+                        {review.amenities_mentioned.healthcare?.slice(0, 3).map((amenity, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-red-50 text-red-700 rounded text-xs flex items-center gap-1">
+                                🏥 {amenity}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Estate Tag */}
+            {review.estate && (
+                <div className="mb-3">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs font-medium">
+                        <MapPin className="w-3 h-3" />
+                        {review.estate}
+                    </span>
+                </div>
+            )}
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        toggleExpandedReview(review._id);
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+                >
+                    {isExpanded ? (
+                        <>
+                            <ChevronUp className="w-3 h-3" />
+                            Less
+                        </>
+                    ) : (
+                        <>
+                            <ChevronDown className="w-3 h-3" />
+                            More
+                        </>
+                    )}
+                </button>
+
+                <a
+                    href={review.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-xs text-gray-600 hover:text-gray-800 flex items-center gap-1"
+                >
+                    Read on Lemon8
+                    <ExternalLink className="w-3 h-3" />
+                </a>
+        </div>
+            </div >
         );
     };
 
-    return (
-        <div className="min-h-screen bg-gray-50">
-            <Navigation />
-            
-            <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3 mb-2">
-                        <Newspaper className="w-10 h-10 text-blue-600" />
-                        Market Intelligence
-                    </h1>
-                    <p className="text-gray-600">Track sentiment and insights across Singapore regions</p>
+return (
+    <div className="min-h-screen bg-gray-50">
+        <Navigation />
+
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Header */}
+            <div className="mb-8">
+                <h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3 mb-2">
+                    <Newspaper className="w-10 h-10 text-blue-600" />
+                    Market Intelligence
+                </h1>
+                <p className="text-gray-600">Track sentiment and insights across Singapore regions</p>
+
+                {/* Tabs */}
+                <div className="flex gap-4 mt-6 border-b-2 border-gray-200">
+                    <button
+                        onClick={() => setActiveTab('news')}
+                        className={`px-6 py-3 font-semibold transition-all ${activeTab === 'news'
+                                ? 'text-blue-600 border-b-4 border-blue-600 -mb-[2px]'
+                                : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        📰 News & Market Intelligence
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('community')}
+                        className={`px-6 py-3 font-semibold transition-all ${activeTab === 'community'
+                                ? 'text-blue-600 border-b-4 border-blue-600 -mb-[2px]'
+                                : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        💬 Community Reviews (Lemon8)
+                    </button>
                 </div>
+            </div>
 
-                {/* Area Ratings Section */}
-                <div className="mb-8">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Area Reviews & Ratings</h2>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        {Object.keys(REGIONS).map(region => {
-                            const data = getAreaRating(region);
-                            const isSelected = selectedRegion === region;
-                            
-                            return (
-                                <div
-                                    key={region}
-                                    onClick={() => {
-                                        setSelectedRegion(region);
-                                        setSelectedTown('');
-                                    }}
-                                    className={`bg-white border-2 rounded-2xl p-4 cursor-pointer transition-all hover:shadow-lg ${
-                                        isSelected ? 'border-blue-500 shadow-lg' : 'border-gray-200'
+            {/* Area Ratings Section */}
+            <div className="mb-8">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Area Reviews & Ratings</h2>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    {Object.keys(REGIONS).map(region => {
+                        const data = getAreaRating(region);
+                        const isSelected = selectedRegion === region;
+
+                        return (
+                            <div
+                                key={region}
+                                onClick={() => {
+                                    setSelectedRegion(region);
+                                    setSelectedTown('');
+                                }}
+                                className={`bg-white border-2 rounded-2xl p-4 cursor-pointer transition-all hover:shadow-lg ${isSelected ? 'border-blue-500 shadow-lg' : 'border-gray-200'
                                     }`}
-                                >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h3 className="font-bold text-gray-900 text-sm">{region}</h3>
-                                        {data.trend === 'up' && <TrendingUp className="w-4 h-4 text-green-600" />}
-                                        {data.trend === 'stable' && <Minus className="w-4 h-4 text-gray-600" />}
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-1 mb-2">
-                                        <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                                        <span className="font-bold text-lg">{data.rating}</span>
-                                        <span className="text-xs text-gray-500">({data.reviews})</span>
-                                    </div>
-                                    
-                                    <p className="text-xs text-gray-600">Avg: ${data.avgPrice}</p>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Town Selector for Selected Region */}
-                    {selectedRegion !== 'All' && (
-                        <div className="mt-4 bg-white border-2 border-gray-200 rounded-2xl p-4">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Town in {selectedRegion}:
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => setSelectedTown('')}
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                        !selectedTown 
-                                            ? 'bg-blue-600 text-white' 
-                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                    }`}
-                                >
-                                    All Towns
-                                </button>
-                                {REGIONS[selectedRegion].map(town => (
-                                    <button
-                                        key={town}
-                                        onClick={() => setSelectedTown(town)}
-                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                            selectedTown === town 
-                                                ? 'bg-blue-600 text-white' 
-                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                        }`}
-                                    >
-                                        {town}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Filters Bar */}
-                <div className="bg-white border-2 border-gray-200 rounded-2xl p-4 mb-6">
-                    <div className="flex items-center gap-4 flex-wrap">
-                        {/* Search */}
-                        <div className="flex-1 min-w-[200px]">
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                <input
-                                    type="text"
-                                    placeholder="Search articles..."
-                                    value={filters.search}
-                                    onChange={(e) => handleFilterChange('search', e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Source Type Filter */}
-                        <select
-                            value={filters.sourceType}
-                            onChange={(e) => handleFilterChange('sourceType', e.target.value)}
-                            className="px-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors bg-white"
-                        >
-                            <option value="">All Source Types</option>
-                            <option value="government">🏛️ Government</option>
-                            <option value="property_portal">🏢 Property Portals</option>
-                            <option value="news_media">📰 News Media</option>
-                        </select>
-
-                        {/* Sort */}
-                        <select
-                            value={`${sortBy}-${sortOrder}`}
-                            onChange={(e) => {
-                                const [field, order] = e.target.value.split('-');
-                                setSortBy(field);
-                                setSortOrder(order);
-                            }}
-                            className="px-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors bg-white"
-                        >
-                            <option value="published_at-desc">Latest First</option>
-                            <option value="published_at-asc">Oldest First</option>
-                            <option value="relevance_score-desc">Most Relevant</option>
-                        </select>
-
-                        {/* Clear Filters */}
-                        {(Object.values(filters).some(v => v) || selectedRegion !== 'All') && (
-                            <button
-                                onClick={clearFilters}
-                                className="px-4 py-2 bg-red-100 text-red-700 rounded-xl text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-2"
                             >
-                                <X className="w-4 h-4" />
-                                Clear
-                            </button>
-                        )}
-                    </div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="font-bold text-gray-900 text-sm">{region}</h3>
+                                    {data.trend === 'up' && <TrendingUp className="w-4 h-4 text-green-600" />}
+                                    {data.trend === 'stable' && <Minus className="w-4 h-4 text-gray-600" />}
+                                </div>
 
-                    {/* Stats */}
-                    <div className="flex items-center gap-6 mt-4 pt-4 border-t-2 border-gray-100 text-sm text-gray-600">
-                        <span className="flex items-center gap-2">
-                            <ThumbsUp className="w-4 h-4 text-green-600" />
-                            <strong className="text-green-600">{positiveArticles.length}</strong> Positive
-                        </span>
-                        <span className="flex items-center gap-2">
-                            <Minus className="w-4 h-4 text-gray-600" />
-                            <strong className="text-gray-600">{neutralArticles.length}</strong> Neutral
-                        </span>
-                        <span className="flex items-center gap-2">
-                            <ThumbsDown className="w-4 h-4 text-red-600" />
-                            <strong className="text-red-600">{negativeArticles.length}</strong> Negative
-                        </span>
-                    </div>
+                                <div className="flex items-center gap-1 mb-2">
+                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                    <span className="font-bold text-lg">{data.rating}</span>
+                                    <span className="text-xs text-gray-500">({data.reviews})</span>
+                                </div>
+
+                                <p className="text-xs text-gray-600">Avg: ${data.avgPrice}</p>
+                            </div>
+                        );
+                    })}
                 </div>
 
-                {/* Loading State */}
-                {loading && (
-                    <div className="flex items-center justify-center py-20">
-                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-blue-600"></div>
-                    </div>
-                )}
-
-                {/* Error State */}
-                {error && (
-                    <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 text-center">
-                        <p className="text-red-600 font-medium mb-4">{error}</p>
-                        <button
-                            onClick={fetchArticles}
-                            className="px-6 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors"
-                        >
-                            Retry
-                        </button>
-                    </div>
-                )}
-
-                {/* Kanban Board - 3 Columns */}
-                {!loading && !error && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Positive Column */}
-                        <div className={`${positiveArticles.length === 0 ? 'hidden lg:block' : ''}`}>
-                            <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <ThumbsUp className="w-5 h-5" />
-                                        <h3 className="font-bold text-lg">Positive News</h3>
-                                    </div>
-                                    <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
-                                        {positiveArticles.length}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                {positiveArticles.length > 0 ? (
-                                    positiveArticles.map(article => renderArticleCard(article))
-                                ) : (
-                                    <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
-                                        <p className="text-gray-500 text-sm">No positive articles</p>
-                                    </div>
-                                )}
-                            </div>
+                {/* Town Selector for Selected Region */}
+                {selectedRegion !== 'All' && (
+                    <div className="mt-4 bg-white border-2 border-gray-200 rounded-2xl p-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Select Town in {selectedRegion}:
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setSelectedTown('')}
+                                className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${!selectedTown
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                            >
+                                All Towns
+                            </button>
+                            {REGIONS[selectedRegion].map(town => (
+                                <button
+                                    key={town}
+                                    onClick={() => setSelectedTown(town)}
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${selectedTown === town
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {town}
+                                </button>
+                            ))}
                         </div>
-
-                        {/* Neutral Column */}
-                        <div className={`${neutralArticles.length === 0 ? 'hidden lg:block' : ''}`}>
-                            <div className="bg-gradient-to-br from-gray-500 to-gray-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Minus className="w-5 h-5" />
-                                        <h3 className="font-bold text-lg">Neutral Updates</h3>
-                                    </div>
-                                    <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
-                                        {neutralArticles.length}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                {neutralArticles.length > 0 ? (
-                                    neutralArticles.map(article => renderArticleCard(article))
-                                ) : (
-                                    <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
-                                        <p className="text-gray-500 text-sm">No neutral articles</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Negative Column */}
-                        <div className={`${negativeArticles.length === 0 ? 'hidden lg:block' : ''}`}>
-                            <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <ThumbsDown className="w-5 h-5" />
-                                        <h3 className="font-bold text-lg">Negative News</h3>
-                                    </div>
-                                    <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
-                                        {negativeArticles.length}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                {negativeArticles.length > 0 ? (
-                                    negativeArticles.map(article => renderArticleCard(article))
-                                ) : (
-                                    <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
-                                        <p className="text-gray-500 text-sm">No negative articles</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* No Results */}
-                {!loading && !error && articles.length === 0 && (
-                    <div className="bg-white border-2 border-gray-200 rounded-2xl p-12 text-center">
-                        <Newspaper className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-600 text-lg mb-4">No articles found</p>
-                        <button
-                            onClick={clearFilters}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
-                        >
-                            Clear Filters
-                        </button>
                     </div>
                 )}
             </div>
+
+            {/* NEWS TAB */}
+            {activeTab === 'news' && (
+                <>
+                    {/* Filters Bar */}
+                    <div className="bg-white border-2 border-gray-200 rounded-2xl p-4 mb-6">
+                        <div className="flex items-center gap-4 flex-wrap">
+                            {/* Search */}
+                            <div className="flex-1 min-w-[200px]">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search articles..."
+                                        value={filters.search}
+                                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Source Type Filter */}
+                            <select
+                                value={filters.sourceType}
+                                onChange={(e) => handleFilterChange('sourceType', e.target.value)}
+                                className="px-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors bg-white"
+                            >
+                                <option value="">All Source Types</option>
+                                <option value="government">🏛️ Government</option>
+                                <option value="property_portal">🏢 Property Portals</option>
+                                <option value="news_media">📰 News Media</option>
+                            </select>
+
+                            {/* Sort */}
+                            <select
+                                value={`${sortBy}-${sortOrder}`}
+                                onChange={(e) => {
+                                    const [field, order] = e.target.value.split('-');
+                                    setSortBy(field);
+                                    setSortOrder(order);
+                                }}
+                                className="px-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors bg-white"
+                            >
+                                <option value="published_at-desc">Latest First</option>
+                                <option value="published_at-asc">Oldest First</option>
+                                <option value="relevance_score-desc">Most Relevant</option>
+                            </select>
+
+                            {/* Clear Filters */}
+                            {(Object.values(filters).some(v => v) || selectedRegion !== 'All') && (
+                                <button
+                                    onClick={clearFilters}
+                                    className="px-4 py-2 bg-red-100 text-red-700 rounded-xl text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-2"
+                                >
+                                    <X className="w-4 h-4" />
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Stats */}
+                        <div className="flex items-center gap-6 mt-4 pt-4 border-t-2 border-gray-100 text-sm text-gray-600">
+                            <span className="flex items-center gap-2">
+                                <ThumbsUp className="w-4 h-4 text-green-600" />
+                                <strong className="text-green-600">{positiveArticles.length}</strong> Positive
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <Minus className="w-4 h-4 text-gray-600" />
+                                <strong className="text-gray-600">{neutralArticles.length}</strong> Neutral
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <ThumbsDown className="w-4 h-4 text-red-600" />
+                                <strong className="text-red-600">{negativeArticles.length}</strong> Negative
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Loading State */}
+                    {loading && (
+                        <div className="flex items-center justify-center py-20">
+                            <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-blue-600"></div>
+                        </div>
+                    )}
+
+                    {/* Error State */}
+                    {error && (
+                        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 text-center">
+                            <p className="text-red-600 font-medium mb-4">{error}</p>
+                            <button
+                                onClick={fetchArticles}
+                                className="px-6 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Kanban Board - 3 Columns */}
+                    {!loading && !error && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Positive Column */}
+                            <div className={`${positiveArticles.length === 0 ? 'hidden lg:block' : ''}`}>
+                                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <ThumbsUp className="w-5 h-5" />
+                                            <h3 className="font-bold text-lg">Positive News</h3>
+                                        </div>
+                                        <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
+                                            {positiveArticles.length}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {positiveArticles.length > 0 ? (
+                                        positiveArticles.map(article => renderArticleCard(article))
+                                    ) : (
+                                        <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
+                                            <p className="text-gray-500 text-sm">No positive articles</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Neutral Column */}
+                            <div className={`${neutralArticles.length === 0 ? 'hidden lg:block' : ''}`}>
+                                <div className="bg-gradient-to-br from-gray-500 to-gray-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Minus className="w-5 h-5" />
+                                            <h3 className="font-bold text-lg">Neutral Updates</h3>
+                                        </div>
+                                        <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
+                                            {neutralArticles.length}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {neutralArticles.length > 0 ? (
+                                        neutralArticles.map(article => renderArticleCard(article))
+                                    ) : (
+                                        <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
+                                            <p className="text-gray-500 text-sm">No neutral articles</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Negative Column */}
+                            <div className={`${negativeArticles.length === 0 ? 'hidden lg:block' : ''}`}>
+                                <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <ThumbsDown className="w-5 h-5" />
+                                            <h3 className="font-bold text-lg">Negative News</h3>
+                                        </div>
+                                        <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
+                                            {negativeArticles.length}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {negativeArticles.length > 0 ? (
+                                        negativeArticles.map(article => renderArticleCard(article))
+                                    ) : (
+                                        <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
+                                            <p className="text-gray-500 text-sm">No negative articles</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* No Results */}
+                    {!loading && !error && articles.length === 0 && (
+                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-12 text-center">
+                            <Newspaper className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                            <p className="text-gray-600 text-lg mb-4">No articles found</p>
+                            <button
+                                onClick={clearFilters}
+                                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* COMMUNITY TAB */}
+            {activeTab === 'community' && (
+                <>
+                    {/* Filters Bar for Lemon8 */}
+                    <div className="bg-white border-2 border-gray-200 rounded-2xl p-4 mb-6">
+                        <div className="flex items-center gap-4 flex-wrap">
+                            {/* Search */}
+                            <div className="flex-1 min-w-[200px]">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search reviews..."
+                                        value={filters.search}
+                                        onChange={(e) => handleFilterChange('search', e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Clear Filters */}
+                            {(filters.search || selectedRegion !== 'All') && (
+                                <button
+                                    onClick={clearFilters}
+                                    className="px-4 py-2 bg-red-100 text-red-700 rounded-xl text-sm font-medium hover:bg-red-200 transition-colors flex items-center gap-2"
+                                >
+                                    <X className="w-4 h-4" />
+                                    Clear
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Stats */}
+                        <div className="flex items-center gap-6 mt-4 pt-4 border-t-2 border-gray-100 text-sm text-gray-600">
+                            <span className="flex items-center gap-2">
+                                <ThumbsUp className="w-4 h-4 text-green-600" />
+                                <strong className="text-green-600">{positiveLemon8.length}</strong> Positive
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <Minus className="w-4 h-4 text-gray-600" />
+                                <strong className="text-gray-600">{neutralLemon8.length}</strong> Neutral
+                            </span>
+                            <span className="flex items-center gap-2">
+                                <ThumbsDown className="w-4 h-4 text-red-600" />
+                                <strong className="text-red-600">{negativeLemon8.length}</strong> Negative
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Loading State */}
+                    {lemon8Loading && (
+                        <div className="flex items-center justify-center py-20">
+                            <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-yellow-500"></div>
+                        </div>
+                    )}
+
+                    {/* Error State */}
+                    {lemon8Error && (
+                        <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-8 text-center">
+                            <p className="text-red-600 font-medium mb-4">{lemon8Error}</p>
+                            <button
+                                onClick={fetchLemon8Reviews}
+                                className="px-6 py-3 bg-red-600 text-white rounded-xl font-medium hover:bg-red-700 transition-colors"
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Kanban Board - 3 Columns for Lemon8 */}
+                    {!lemon8Loading && !lemon8Error && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Positive Column */}
+                            <div>
+                                <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <ThumbsUp className="w-5 h-5" />
+                                            <h3 className="font-bold text-lg">Positive Reviews</h3>
+                                        </div>
+                                        <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
+                                            {positiveLemon8.length}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {positiveLemon8.length > 0 ? (
+                                        positiveLemon8.map(review => renderLemon8Card(review))
+                                    ) : (
+                                        <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
+                                            <p className="text-gray-500 text-sm">No positive reviews</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Neutral Column */}
+                            <div>
+                                <div className="bg-gradient-to-br from-gray-500 to-gray-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Minus className="w-5 h-5" />
+                                            <h3 className="font-bold text-lg">Neutral Reviews</h3>
+                                        </div>
+                                        <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
+                                            {neutralLemon8.length}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {neutralLemon8.length > 0 ? (
+                                        neutralLemon8.map(review => renderLemon8Card(review))
+                                    ) : (
+                                        <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
+                                            <p className="text-gray-500 text-sm">No neutral reviews</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Negative Column */}
+                            <div>
+                                <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-2xl p-4 mb-4 sticky top-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <ThumbsDown className="w-5 h-5" />
+                                            <h3 className="font-bold text-lg">Negative Reviews</h3>
+                                        </div>
+                                        <span className="bg-white bg-opacity-30 px-3 py-1 rounded-full text-sm font-bold">
+                                            {negativeLemon8.length}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {negativeLemon8.length > 0 ? (
+                                        negativeLemon8.map(review => renderLemon8Card(review))
+                                    ) : (
+                                        <div className="bg-white border-2 border-gray-200 rounded-xl p-8 text-center">
+                                            <p className="text-gray-500 text-sm">No negative reviews</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* No Results */}
+                    {!lemon8Loading && !lemon8Error && lemon8Reviews.length === 0 && (
+                        <div className="bg-white border-2 border-gray-200 rounded-2xl p-12 text-center">
+                            <div className="text-6xl mb-4">🍋</div>
+                            <p className="text-gray-600 text-lg mb-4">No community reviews found</p>
+                            <button
+                                onClick={clearFilters}
+                                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+                            >
+                                Clear Filters
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
         </div>
-    );
+    </div>
+);
 }
