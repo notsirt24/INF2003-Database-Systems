@@ -236,6 +236,44 @@ app.get('/api/mongodb-collection/:collectionName', async (req, res) => {
 app.use('/api/news', newsRoutes);
 
 // ============================================
+// DEBUG ENDPOINTS
+// ============================================
+
+// Check what estate names exist in Lemon8 reviews
+app.get('/api/test-lemon8-estates', async (req, res) => {
+    try {
+        const db = req.app.locals.db;
+        
+        if (!db) {
+            return res.status(500).json({ error: 'Database not initialized' });
+        }
+        
+        // Get unique estate values
+        const estates = await db.collection('reviews')
+            .distinct('estate', { source: 'lemon8' });
+        
+        // Get count per estate
+        const estateCounts = await db.collection('reviews')
+            .aggregate([
+                { $match: { source: 'lemon8' } },
+                { $group: { _id: '$estate', count: { $sum: 1 } } },
+                { $sort: { count: -1 } }
+            ])
+            .toArray();
+        
+        res.json({
+            success: true,
+            totalLemon8Reviews: await db.collection('reviews').countDocuments({ source: 'lemon8' }),
+            uniqueEstates: estates.length,
+            estates: estates,
+            estateCounts: estateCounts
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================
 // AUTO-CLEANUP EXPIRED UNVERIFIED USERS
 // ============================================
 async function cleanupExpiredUsers() {
