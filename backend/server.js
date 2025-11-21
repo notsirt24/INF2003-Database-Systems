@@ -61,6 +61,29 @@ app.use('/api', watchlistRoutes);
 const mapRoutes = require('./routes/mapRoutes');
 app.use('/api/map', mapRoutes);
 
+// Initialize MongoDB connection for reviews
+let mongoDb;
+async function initMongoDB() {
+  try {
+    const client = new MongoClient(process.env.MONGODB_URI, mongoOptions);
+    await client.connect();
+    mongoDb = client.db(process.env.MONGODB_DB_NAME);
+    console.log('✅ MongoDB connected for reviews');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+  }
+}
+
+initMongoDB();
+
+// Pass MongoDB to reviews router via middleware
+app.use((req, res, next) => {
+  req.app.locals.db = mongoDb;
+  next();
+});
+
+const reviewsRouter = require('./routes/reviews');
+app.use('/api/reviews', reviewsRouter);
 // ============================================
 // TEST ENDPOINTS (Optional - for debugging)
 // ============================================
