@@ -2242,7 +2242,7 @@ return (
                                 : 'text-gray-500 hover:text-gray-700'
                             }`}
                     >
-                        💬 Community Reviews (Lemon8)
+                        💬 Community Reviews
                     </button>
                     {isLoggedIn && (
                         <button
@@ -2527,14 +2527,14 @@ return (
                 <>
                     {/* Header Section */}
                     <div className="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 rounded-2xl p-6 mb-6 text-white">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
-                                    <span className="text-2xl">🍋</span>
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <div className="w-20 h-16 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                                    <span className="text-3xl">𐦂𖨆𐀪𖠋</span>
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-bold">Community Reviews</h2>
-                                    <p className="text-white text-opacity-90">Real experiences from Lemon8 users</p>
+                                    <p className="text-white text-opacity-90">Real experiences</p>
                                 </div>
                             </div>
                             
