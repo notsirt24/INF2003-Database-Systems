@@ -3,9 +3,11 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import Navigation from '../components/Navigation';
-import { MapPin, Train, Bus, Zap, School, Loader2 } from 'lucide-react';
+import { MapPin, Train, Bus, Zap, School, Loader2, Search, Navigation as NavigationIcon, Clock, DollarSign, CheckCircle, AlertCircle, PersonStanding, Bike, Car } from 'lucide-react';
 
-// Fix default marker icon issue in React-Leaflet
+// API endpoint for backend queries
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: require('leaflet/dist/images/marker-icon-2x.png'),
@@ -13,7 +15,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require('leaflet/dist/images/marker-shadow.png'),
 });
 
-// Custom marker icons for different location types
 const createCustomIcon = (color, IconComponent) => {
   return L.divIcon({
     className: 'custom-icon',
@@ -68,7 +69,7 @@ const MapViewController = ({ center, zoom }) => {
   return null;
 };
 
-const InteractiveMap = () => {
+export default function InteractiveMap() {
   const [mrtStations, setMrtStations] = useState([]);
   const [schools, setSchools] = useState([]);
   const [busStops, setBusStops] = useState([]);
@@ -92,15 +93,21 @@ const InteractiveMap = () => {
   const [selectedLocation, setSelectedLocation] = useState(null); // For clicked search results
 
   // Route planning state
-  const [routeStart, setRouteStart] = useState(null); // {type, name, latitude, longitude, subtitle}
-  const [routeEnd, setRouteEnd] = useState(null);   // same shape as start
-  const [routePolyline, setRoutePolyline] = useState([]); // [[lat,lng], [lat,lng]]
+  const [routeStart, setRouteStart] = useState(null);
+  const [routeEnd, setRouteEnd] = useState(null);
+  const [routePolyline, setRoutePolyline] = useState([]);
   const [routeDistanceMeters, setRouteDistanceMeters] = useState(null);
   const [routeEtaMinutes, setRouteEtaMinutes] = useState(null);
   const [nearestTransit, setNearestTransit] = useState({ mrt: null, bus: null });
+  const [routeMode, setRouteMode] = useState('walking');
+  const [toastMessage, setToastMessage] = useState(null);
 
-  // Singapore center coordinates
   const singaporeCenter = [1.3521, 103.8198];
+
+  const showToast = (message, type = 'success') => {
+    setToastMessage({ message, type });
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   useEffect(() => {
     fetchMapData();
@@ -112,10 +119,10 @@ const InteractiveMap = () => {
       
       // Fetch all data in parallel
       const [mrtRes, schoolsRes, busStopsRes, evRes] = await Promise.all([
-        fetch('http://localhost:3001/api/map/mrt-stations'),
-        fetch('http://localhost:3001/api/map/schools'),
-        fetch('http://localhost:3001/api/map/bus-stops'),
-        fetch('http://localhost:3001/api/map/ev-charging')
+        fetch(`${API_URL}/map/mrt-stations`),
+        fetch(`${API_URL}/map/schools`),
+        fetch(`${API_URL}/map/bus-stops`),
+        fetch(`${API_URL}/map/ev-charging`)
       ]);
 
       if (mrtRes.ok) {
@@ -127,7 +134,7 @@ const InteractiveMap = () => {
         const schoolsData = await schoolsRes.json();
         // Log first school to see the data structure
         if (schoolsData.length > 0) {
-          console.log('Sample school data:', schoolsData[0]);
+
         }
         setSchools(schoolsData);
       }
@@ -186,8 +193,15 @@ const InteractiveMap = () => {
         routeEnd.longitude
       );
       setRouteDistanceMeters(Math.round(dist));
-      // walking speed ~ 5 km/h => 83.33 m/min
-      setRouteEtaMinutes(Math.max(1, Math.round(dist / 83.33)));
+      
+      let speed;
+      switch(routeMode) {
+        case 'walking': speed = 83.33; break;
+        case 'cycling': speed = 250; break;
+        case 'driving': speed = 666.67; break;
+        default: speed = 83.33; break;
+      }
+      setRouteEtaMinutes(Math.max(1, Math.round(dist / speed)));
 
       // Center roughly between start and end
       const midLat = (routeStart.latitude + routeEnd.latitude) / 2;
@@ -200,9 +214,8 @@ const InteractiveMap = () => {
       setRouteEtaMinutes(null);
       setNearestTransit({ mrt: null, bus: null });
     }
-  }, [routeStart, routeEnd]);
+  }, [routeStart, routeEnd, routeMode]);
 
-  // Search functionality
   useEffect(() => {
     if (searchQuery.trim() === '') {
       setSearchResults([]);
@@ -274,10 +287,10 @@ const InteractiveMap = () => {
 
   // Handle search result click
   const handleSearchResultClick = (result) => {
-    console.log('Search result clicked:', result);
+
     if (result.latitude && result.longitude) {
       const newCenter = [result.latitude, result.longitude];
-      console.log('Setting map center to:', newCenter);
+
       setMapCenter(newCenter);
       setMapZoom(17);
       setSelectedLocation(result); // Set the selected location to show its popup
@@ -286,8 +299,7 @@ const InteractiveMap = () => {
     }
   };
 
-  // Helpers to set route points from an entity
-  const buildLocationFromEntity = (type, entity) => {
+  const createLocation = (type, entity) => {
     switch (type) {
       case 'MRT Station':
         return {
@@ -355,7 +367,7 @@ const InteractiveMap = () => {
       return true;
     });
     
-    console.log(`Filtering schools by ${schoolFilter}: ${filtered.length} of ${schools.length}`);
+
     return filtered;
   };
 
@@ -386,8 +398,33 @@ const InteractiveMap = () => {
         {/* Route Planner */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-4">
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <span>🧭</span> Route Planner
+            <NavigationIcon className="w-5 h-5 text-purple-600" /> Route Planner
           </h3>
+          
+          {/* Travel Mode Selector */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Travel Mode</label>
+            <div className="flex gap-2">
+              {[
+                { id: 'walking', label: 'Walking', icon: PersonStanding },
+                { id: 'cycling', label: 'Cycling', icon: Bike },
+                { id: 'driving', label: 'Driving', icon: Car }
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => setRouteMode(mode.id)}
+                  className={`px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                    routeMode === mode.id
+                      ? 'bg-purple-100 text-purple-700 border-2 border-purple-300'
+                      : 'bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200'
+                  }`}
+                >
+                  <mode.icon className="w-4 h-4" />
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="p-3 rounded border border-gray-200">
               <div className="text-xs text-gray-500 mb-1">Start</div>
@@ -446,37 +483,85 @@ const InteractiveMap = () => {
           </div>
 
           {(routeDistanceMeters || nearestTransit.mrt || nearestTransit.bus) && (
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="mt-4 space-y-4">
               {routeDistanceMeters && (
-                <div className="p-3 rounded border border-purple-200 bg-purple-50">
-                  <div className="text-xs text-purple-700">Distance</div>
-                  <div className="text-lg font-semibold text-purple-800">{(routeDistanceMeters/1000).toFixed(2)} km</div>
-                  <div className="text-xs text-purple-700">Walking ~ {routeEtaMinutes} min</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="p-3 rounded border border-purple-200 bg-purple-50">
+                    <div className="text-xs text-purple-700 flex items-center gap-1">
+                      <MapPin className="w-3 h-3" /> Distance
+                    </div>
+                    <div className="text-lg font-semibold text-purple-800">{(routeDistanceMeters/1000).toFixed(2)} km</div>
+                    <div className="text-xs text-purple-700">Straight line</div>
+                  </div>
+                  
+                  <div className="p-3 rounded border border-blue-200 bg-blue-50">
+                    <div className="text-xs text-blue-700 flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> Travel Time
+                    </div>
+                    <div className="text-lg font-semibold text-blue-800">
+                      {routeMode === 'walking' && `${Math.ceil(routeDistanceMeters / 83.33)} min`}
+                      {routeMode === 'cycling' && `${Math.ceil(routeDistanceMeters / 250)} min`}
+                      {routeMode === 'driving' && `${Math.ceil(routeDistanceMeters / 666.67)} min`}
+                    </div>
+                    <div className="text-xs text-blue-700 capitalize">{routeMode}</div>
+                  </div>
+                  
+                  <div className="p-3 rounded border border-green-200 bg-green-50">
+                    <div className="text-xs text-green-700 flex items-center gap-1">
+                      <DollarSign className="w-3 h-3" /> Est. Cost
+                    </div>
+                    <div className="text-lg font-semibold text-green-800">
+                      {routeMode === 'walking' && 'Free'}
+                      {routeMode === 'cycling' && 'Free'}
+                      {routeMode === 'driving' && `$${(routeDistanceMeters / 1000 * 0.22).toFixed(2)}`}
+                    </div>
+                    <div className="text-xs text-green-700">
+                      {routeMode === 'driving' ? 'Fuel + ERP' : 'No cost'}
+                    </div>
+                  </div>
                 </div>
               )}
-              {nearestTransit.mrt && (
-                <div className="p-3 rounded border border-red-200 bg-red-50">
-                  <div className="text-xs text-red-700">Nearest MRT</div>
-                  <div className="text-sm font-medium text-red-800">{nearestTransit.mrt.stn_name}</div>
-                  <button
-                    onClick={() => setRouteEnd(buildLocationFromEntity('MRT Station', nearestTransit.mrt))}
-                    className="mt-2 px-3 py-1.5 text-xs rounded bg-red-600 text-white hover:bg-red-700"
-                  >
-                    Set as Destination
-                  </button>
-                </div>
-              )}
-              {nearestTransit.bus && (
-                <div className="p-3 rounded border border-blue-200 bg-blue-50">
-                  <div className="text-xs text-blue-700">Nearest Bus Stop</div>
-                  <div className="text-sm font-medium text-blue-800">{nearestTransit.bus.description || 'Bus Stop'} ({nearestTransit.bus.bus_stop_code})</div>
-                  <button
-                    onClick={() => setRouteEnd(buildLocationFromEntity('Bus Stop', nearestTransit.bus))}
-                    className="mt-2 px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
-                  >
-                    Set as Destination
-                  </button>
-                </div>
+              
+              {/* Transit suggestions */}
+              {(nearestTransit.mrt || nearestTransit.bus) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {nearestTransit.mrt && (
+                  <div className="p-3 rounded border border-red-200 bg-red-50">
+                    <div className="text-xs text-red-700 flex items-center gap-1">
+                      <Train className="w-3 h-3" /> Nearest MRT
+                    </div>
+                    <div className="text-sm font-medium text-red-800">{nearestTransit.mrt.stn_name}</div>
+                    <button
+                      onClick={() => {
+                        setRouteEnd(createLocation('MRT Station', nearestTransit.mrt));
+                        showToast(`Set ${nearestTransit.mrt.stn_name} as destination`, 'success');
+                      }}
+                      className="mt-2 px-3 py-1.5 text-xs rounded bg-red-600 text-white hover:bg-red-700 flex items-center gap-1"
+                    >
+                      <NavigationIcon className="w-3 h-3" />
+                      Set as Destination
+                    </button>
+                  </div>
+                )}
+                {nearestTransit.bus && (
+                  <div className="p-3 rounded border border-blue-200 bg-blue-50">
+                    <div className="text-xs text-blue-700 flex items-center gap-1">
+                      <Bus className="w-3 h-3" /> Nearest Bus Stop
+                    </div>
+                    <div className="text-sm font-medium text-blue-800">{nearestTransit.bus.description || 'Bus Stop'} ({nearestTransit.bus.bus_stop_code})</div>
+                    <button
+                      onClick={() => {
+                        setRouteEnd(createLocation('Bus Stop', nearestTransit.bus));
+                        showToast(`Set bus stop ${nearestTransit.bus.bus_stop_code} as destination`, 'success');
+                      }}
+                      className="mt-2 px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1"
+                    >
+                      <NavigationIcon className="w-3 h-3" />
+                      Set as Destination
+                    </button>
+                  </div>
+                )}
+              </div>
               )}
             </div>
           )}
@@ -575,7 +660,7 @@ const InteractiveMap = () => {
         {/* Filter Section */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-4">
           <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <span>🔍</span> Filters
+            <Search className="w-5 h-5 text-gray-600" /> Filters
           </h3>
           {/* School Filter */}
           <div>
@@ -686,15 +771,23 @@ const InteractiveMap = () => {
                     </p>
                     <div className="mt-3 flex gap-2">
                       <button
-                        onClick={() => setRouteStart(buildLocationFromEntity('MRT Station', station))}
-                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                        onClick={() => {
+                          setRouteStart(createLocation('MRT Station', station));
+                          showToast(`Set ${station.stn_name} as starting point`, 'success');
+                        }}
+                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-1"
                       >
+                        <CheckCircle className="w-3 h-3" />
                         Set as Start
                       </button>
                       <button
-                        onClick={() => setRouteEnd(buildLocationFromEntity('MRT Station', station))}
-                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        onClick={() => {
+                          setRouteEnd(createLocation('MRT Station', station));
+                          showToast(`Set ${station.stn_name} as destination`, 'success');
+                        }}
+                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200 flex items-center gap-1"
                       >
+                        <NavigationIcon className="w-3 h-3" />
                         Set as Destination
                       </button>
                     </div>
@@ -729,15 +822,23 @@ const InteractiveMap = () => {
                       )}
                       <div className="mt-3 flex gap-2">
                         <button
-                          onClick={() => setRouteStart(buildLocationFromEntity('School', school))}
-                          className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                          onClick={() => {
+                            setRouteStart(createLocation('School', school));
+                            showToast(`Set ${school.school_name} as starting point`, 'success');
+                          }}
+                          className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-1"
                         >
+                          <CheckCircle className="w-3 h-3" />
                           Set as Start
                         </button>
                         <button
-                          onClick={() => setRouteEnd(buildLocationFromEntity('School', school))}
-                          className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                          onClick={() => {
+                            setRouteEnd(createLocation('School', school));
+                            showToast(`Set ${school.school_name} as destination`, 'success');
+                          }}
+                          className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200 flex items-center gap-1"
                         >
+                          <NavigationIcon className="w-3 h-3" />
                           Set as Destination
                         </button>
                       </div>
@@ -771,15 +872,23 @@ const InteractiveMap = () => {
                     </p>
                     <div className="mt-3 flex gap-2">
                       <button
-                        onClick={() => setRouteStart(buildLocationFromEntity('Bus Stop', busStop))}
-                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                        onClick={() => {
+                          setRouteStart(createLocation('Bus Stop', busStop));
+                          showToast(`Set bus stop ${busStop.bus_stop_code} as starting point`, 'success');
+                        }}
+                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-1"
                       >
+                        <CheckCircle className="w-3 h-3" />
                         Set as Start
                       </button>
                       <button
-                        onClick={() => setRouteEnd(buildLocationFromEntity('Bus Stop', busStop))}
-                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        onClick={() => {
+                          setRouteEnd(createLocation('Bus Stop', busStop));
+                          showToast(`Set bus stop ${busStop.bus_stop_code} as destination`, 'success');
+                        }}
+                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200 flex items-center gap-1"
                       >
+                        <NavigationIcon className="w-3 h-3" />
                         Set as Destination
                       </button>
                     </div>
@@ -831,15 +940,23 @@ const InteractiveMap = () => {
                       )}
                       <div className="mt-3 flex gap-2">
                         <button
-                          onClick={() => setRouteStart(buildLocationFromEntity('EV Charging', evSpot))}
-                          className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                          onClick={() => {
+                            setRouteStart(createLocation('EV Charging', evSpot));
+                            showToast(`Set ${evSpot.name} as starting point`, 'success');
+                          }}
+                          className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-1"
                         >
+                          <CheckCircle className="w-3 h-3" />
                           Set as Start
                         </button>
                         <button
-                          onClick={() => setRouteEnd(buildLocationFromEntity('EV Charging', evSpot))}
-                          className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                          onClick={() => {
+                            setRouteEnd(createLocation('EV Charging', evSpot));
+                            showToast(`Set ${evSpot.name} as destination`, 'success');
+                          }}
+                          className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200 flex items-center gap-1"
                         >
+                          <NavigationIcon className="w-3 h-3" />
                           Set as Destination
                         </button>
                       </div>
@@ -915,15 +1032,23 @@ const InteractiveMap = () => {
                     )}
                     <div className="mt-3 flex gap-2">
                       <button
-                        onClick={() => setRouteStart(buildLocationFromEntity(selectedLocation.type, selectedLocation))}
-                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700"
+                        onClick={() => {
+                          setRouteStart(createLocation(selectedLocation.type, selectedLocation));
+                          showToast(`Set ${selectedLocation.displayName} as starting point`, 'success');
+                        }}
+                        className="px-3 py-1.5 text-xs rounded bg-purple-600 text-white hover:bg-purple-700 flex items-center gap-1"
                       >
+                        <CheckCircle className="w-3 h-3" />
                         Set as Start
                       </button>
                       <button
-                        onClick={() => setRouteEnd(buildLocationFromEntity(selectedLocation.type, selectedLocation))}
-                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        onClick={() => {
+                          setRouteEnd(createLocation(selectedLocation.type, selectedLocation));
+                          showToast(`Set ${selectedLocation.displayName} as destination`, 'success');
+                        }}
+                        className="px-3 py-1.5 text-xs rounded bg-gray-100 text-gray-800 hover:bg-gray-200 flex items-center gap-1"
                       >
+                        <NavigationIcon className="w-3 h-3" />
                         Set as Destination
                       </button>
                     </div>
@@ -964,9 +1089,22 @@ const InteractiveMap = () => {
             </div>
           </div>
         </div>
+        
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className={`fixed top-24 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+            toastMessage.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              {toastMessage.type === 'success' ? 
+                <CheckCircle className="w-5 h-5" /> : 
+                <AlertCircle className="w-5 h-5" />
+              }
+              <span className="font-medium">{toastMessage.message}</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-};
-
-export default InteractiveMap;
+}

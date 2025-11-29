@@ -68,7 +68,7 @@ async function getEnhancedWatchlistData(userId, pool) {
     JOIN hdbblock hb ON hf.block_id = hb.block_id
     JOIN town t ON hb.town_id = t.town_id
     ORDER BY rt.contract_date DESC
-    LIMIT 1000
+    LIMIT 100000
   `;
 
   const { rows: allTransactions } = await pool.query(allTransactionsQuery);

@@ -88,7 +88,7 @@ export default function ListOfListings({ showHeader = true, searchTerm = '', fil
   useEffect(() => {
     (async () => {
       try {
-        const resp = await fetch(`${API_URL}/listings?limit=100`); // Increased limit for better filtering
+        const resp = await fetch(`${API_URL}/listings?limit=100000`); // Increased limit for better filtering
         if (!resp.ok) throw new Error(`Failed to load listings (${resp.status})`);
         const json = await resp.json();
         setListings(json.listings || []);
@@ -350,38 +350,78 @@ export default function ListOfListings({ showHeader = true, searchTerm = '', fil
 
             {/* Pagination controls */}
             {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-center space-x-3">
+              <div className="mt-8 flex items-center justify-center space-x-2">
+
+                {/* Prev Button */}
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded-md border ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                  className={`px-3 py-1 rounded-md border 
+                    ${currentPage === 1 ? 'text-gray-400 border-gray-200' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
                 >
                   &lt;
                 </button>
 
-                {Array.from({ length: totalPages }).map((_, idx) => {
-                  const page = idx + 1;
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      aria-current={currentPage === page}
-                      className={`px-3 py-1 rounded-md border ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
-                    >
-                      {page}
-                    </button>
-                  );
-                })}
+                {/* Page Numbers */}
+                {(() => {
+                  const pages = [];
+                  const last = totalPages;
 
+                  const addPage = (p) => {
+                    pages.push(
+                      <button
+                        key={p}
+                        onClick={() => setCurrentPage(p)}
+                        className={`px-3 py-1 rounded-md border 
+                          ${currentPage === p ? 'bg-blue-600 text-white border-blue-600' 
+                                              : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  };
+
+                  // Always show page 1
+                  addPage(1);
+
+                  // Show "..." when far from beginning
+                  if (currentPage > 4) {
+                    pages.push(<span key="start-ellipsis" className="px-2">...</span>);
+                  }
+
+                  // Middle window
+                  const start = Math.max(2, currentPage - 1);
+                  const end   = Math.min(last - 1, currentPage + 1);
+
+                  for (let p = start; p <= end; p++) {
+                    if (p !== 1 && p !== last) addPage(p);
+                  }
+
+                  // Show "..." before last page
+                  if (currentPage < last - 3) {
+                    pages.push(<span key="end-ellipsis" className="px-2">...</span>);
+                  }
+
+                  // Always show last page
+                  if (last > 1) addPage(last);
+
+                  return pages;
+                })()}
+
+                {/* Next Button */}
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded-md border ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+                  className={`px-3 py-1 rounded-md border 
+                    ${currentPage === totalPages ? 'text-gray-400 border-gray-200' : 'text-gray-700 border-gray-300 hover:bg-gray-100'}`}
                 >
                   &gt;
                 </button>
+
               </div>
             )}
+
+            
           </>
         )}
       </div>

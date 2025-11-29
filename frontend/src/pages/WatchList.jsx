@@ -134,6 +134,20 @@ function ListingCard({ property, onAddToWatchlist, onRemoveFromWatchlist, onTogg
 // Listings will be loaded from backend /api/listings; no local fallback
 
 export default function WatchList() {
+  const [allListings, setAllListings] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const resp = await fetch(`${API_URL}/listings?limit=100000`);
+        const json = await resp.json();
+        setAllListings(json.listings || []);
+      } catch (e) {
+        console.error('Failed to load full listings for watchlist grouping:', e);
+      }
+    })();
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [properties, setProperties] = useState([]);
   const [error, setError] = useState(null);
@@ -199,7 +213,9 @@ export default function WatchList() {
             deduped.push(p);
           }
         }
-        setProperties(deduped);
+
+       setProperties(deduped);
+
       } catch (err) {
         console.error('Watchlist fetch error:', err);
         setError('Failed to load watchlist.');
