@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { Pool } = require('pg');
 const { generateVerificationCode, generateResetToken, sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
 
@@ -33,7 +34,6 @@ router.post('/signup', async (req, res) => {
     });
   }
   
-  // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ 
@@ -42,7 +42,6 @@ router.post('/signup', async (req, res) => {
     });
   }
   
-  // Password validation (minimum 6 characters)
   if (password.length < 6) {
     return res.status(400).json({ 
       success: false, 
@@ -55,14 +54,12 @@ router.post('/signup', async (req, res) => {
   try {
     // Check if user already exists
     const userCheck = await client.query(
-      'SELECT user_id, email_verified, verification_code_expires FROM "user" WHERE email = $1',
+      'SELECT user_id, email_verified FROM "user" WHERE email = $1',
       [email.toLowerCase()]
     );
     
     if (userCheck.rows.length > 0) {
       const existingUser = userCheck.rows[0];
-      
-      // If user exists and is verified
       if (existingUser.email_verified) {
         return res.status(409).json({ 
           success: false, 
@@ -70,59 +67,47 @@ router.post('/signup', async (req, res) => {
         });
       }
       
-      // If user exists but not verified, update their verification code
-      const verificationCode = generateVerificationCode();
-      const expiresAt = new Date(Date.now() + 45 * 60 * 1000); // 45 minutes
-      
-      await client.query(
-        `UPDATE "user" 
-         SET verification_code = $1, verification_code_expires = $2, created_at = CURRENT_TIMESTAMP 
-         WHERE user_id = $3`,
-        [verificationCode, expiresAt, existingUser.user_id]
-      );
-      
-      // Send verification email
-      try {
-        await sendVerificationEmail(email, name, verificationCode);
-        console.log('✅ Verification email sent successfully');
-      } catch (emailError) {
-        console.error('❌ Email sending failed:', emailError);
-        console.log(`🔐 Verification code for ${email}: ${verificationCode}`);
-      }
-      
-      return res.status(200).json({
-        success: true,
-        message: 'Verification code resent to your email',
-        requiresVerification: true,
-        email: email.toLowerCase(),
-        verificationCode: verificationCode // Remove in production
+      // Handle unverified existing user (Resend logic can go here or be handled by resend endpoint)
+      // For simplicity in signup, we typically tell them to use login or resend code endpoint
+      return res.status(409).json({
+          success: false,
+          message: 'Account exists but is unverified. Please check your email or request a new code.'
       });
     }
     
-    // Hash password
+    // --- START OF FIX ---
+    
+    // 1. Define salt rounds once
     const saltRounds = 10;
+
+    // 2. Hash the PASSWORD (This was likely missing)
     const password_hash = await bcrypt.hash(password, saltRounds);
     
-    // Generate verification code
+    // 3. Generate RAW verification code
     const verificationCode = generateVerificationCode();
-    const expiresAt = new Date(Date.now() + 45 * 60 * 1000); // 45 minutes from now
 
-    // Insert new user (not verified yet)
+    // 4. Hash the VERIFICATION CODE for storage
+    const verificationCodeHash = await bcrypt.hash(verificationCode, saltRounds);
+
+    const expiresAt = new Date(Date.now() + 45 * 60 * 1000); // 45 mins
+
+    // 5. Insert into DB using BOTH hashes
     const result = await client.query(
       `INSERT INTO "user" (name, email, password_hash, email_verified, verification_code, verification_code_expires, created_at) 
        VALUES ($1, $2, $3, FALSE, $4, $5, CURRENT_TIMESTAMP) 
        RETURNING user_id, name, email, created_at`,
-      [name, email.toLowerCase(), password_hash, verificationCode, expiresAt]
+      [name, email.toLowerCase(), password_hash, verificationCodeHash, expiresAt] 
     );
     
     const newUser = result.rows[0];
     
-    // Try to send verification email
+    // 6. Send the RAW verification code to user email
     try {
-      await sendVerificationEmail(email, name, verificationCode);
+      await sendVerificationEmail(email, name, verificationCode); // Send RAW code
       console.log('✅ Verification email sent successfully');
     } catch (emailError) {
       console.error('❌ Email sending failed:', emailError);
+      // In dev, log the code so you can still verify
       console.log(`🔐 Verification code for ${email}: ${verificationCode}`);
     }
     
@@ -130,8 +115,7 @@ router.post('/signup', async (req, res) => {
       success: true,
       message: 'Verification code sent to your email. Please verify within 45 minutes.',
       requiresVerification: true,
-      email: newUser.email,
-      verificationCode: verificationCode // Remove in production!
+      email: newUser.email
     });
     
   } catch (error) {
@@ -187,8 +171,9 @@ router.post('/verify-email', async (req, res) => {
       });
     }
     
-    // Check if code matches
-    if (user.verification_code !== code) {
+    const isMatch = await bcrypt.compare(code, user.verification_code);
+
+    if (!isMatch) {
       return res.status(400).json({ 
         success: false, 
         message: 'Invalid verification code' 
@@ -304,15 +289,20 @@ router.post('/resend-verification', async (req, res) => {
       });
     }
     
-    // Generate new code and extend timer by another 45 minutes
+    // Generate new code
     const verificationCode = generateVerificationCode();
+
+    // 1. HASH the new code
+    const verificationCodeHash = await bcrypt.hash(verificationCode, 10);
+
     const newExpiresAt = new Date(Date.now() + 45 * 60 * 1000);
-    
+
+    // 2. Update database with HASH
     await client.query(
       `UPDATE "user" 
-       SET verification_code = $1, verification_code_expires = $2 
-       WHERE user_id = $3`,
-      [verificationCode, expiresAt, user.user_id]
+      SET verification_code = $1, verification_code_expires = $2 
+      WHERE user_id = $3`,
+      [verificationCodeHash, newExpiresAt, user.user_id] // Use hash
     );
     
     try {
@@ -526,14 +516,21 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
     
-    // Generate reset token
+    // Generate raw reset token
     const resetToken = generateResetToken();
+
+    // Create a hash of the token for storage
+    const resetTokenHash = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-    
-    // Save reset token
+
+    // Save the HASHED token to database
     await client.query(
       'UPDATE "user" SET reset_token = $1, reset_token_expires = $2 WHERE user_id = $3',
-      [resetToken, expiresAt, user.user_id]
+      [resetTokenHash, expiresAt, user.user_id] // <--- Changed to resetTokenHash
     );
     
     // Send reset email
@@ -586,13 +583,18 @@ router.post('/reset-password', async (req, res) => {
     });
   }
   
+  const resetTokenHash = crypto
+    .createHash('sha256')
+    .update(token)
+    .digest('hex');
+
   const client = await pool.connect();
   
   try {
     // Find user with this token
     const result = await client.query(
       'SELECT user_id, name, email, reset_token_expires FROM "user" WHERE reset_token = $1',
-      [token]
+      [resetTokenHash]
     );
     
     if (result.rows.length === 0) {
