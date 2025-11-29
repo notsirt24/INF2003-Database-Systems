@@ -19,13 +19,9 @@ const allowedOrigins = [
   'http://127.0.0.1:3001'
 ].filter(Boolean);
 
+// Temporary: Allow all origins for development
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (e.g. curl, server-to-server)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error(`CORS policy: Origin ${origin} not allowed`));
-  },
+  origin: true, // Allow all origins for development
   credentials: true
 }));
 app.use(express.json());
@@ -62,19 +58,21 @@ const mapRoutes = require('./routes/mapRoutes');
 app.use('/api/map', mapRoutes);
 
 // Initialize MongoDB connection for reviews
-let mongoDb;
+let mongoDb = null;
 async function initMongoDB() {
   try {
     const client = new MongoClient(process.env.MONGODB_URI, mongoOptions);
     await client.connect();
     mongoDb = client.db(process.env.MONGODB_DB_NAME);
     console.log('✅ MongoDB connected for reviews');
+    return true;
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
+    console.error('❌ MongoDB connection error:', error.message);
+    console.log('⚠️ Server will continue without MongoDB - some features may not work');
+    mongoDb = null;
+    return false;
   }
 }
-
-initMongoDB();
 
 // Pass MongoDB to reviews router via middleware
 app.use((req, res, next) => {
@@ -84,6 +82,14 @@ app.use((req, res, next) => {
 
 const reviewsRouter = require('./routes/reviews');
 app.use('/api/reviews', reviewsRouter);
+
+// Interactive Sentiment Review routes
+const interactiveReviewRoutes = require('./routes/interactiveReviewRoutes');
+app.use('/api/interactive', interactiveReviewRoutes);
+
+const chatbotRoutes = require('./routes/chatbotRoutes');
+app.use('/api/chatbot', chatbotRoutes);
+
 // ============================================
 // TEST ENDPOINTS (Optional - for debugging)
 // ============================================
@@ -323,9 +329,19 @@ app.use((req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
-  console.log(`📊 Dashboard API: http://localhost:${PORT}/api/dashboard`);
-  console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
-  console.log(`🔍 Test endpoints available at /api/test-postgres and /api/test-mongodb`);
-});
+// Start server after MongoDB initialization
+async function startServer() {
+  console.log('🔗 Initializing MongoDB connection...');
+  await initMongoDB();
+  
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on http://localhost:${PORT}`);
+    console.log(`📊 Dashboard API: http://localhost:${PORT}/api/dashboard`);
+    console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
+    console.log(`🤖 Chatbot API: http://localhost:${PORT}/api/chatbot`);
+    console.log(`🔍 Test endpoints available at /api/test-postgres and /api/test-mongodb`);
+    console.log(`📝 Reviews API: http://localhost:${PORT}/api/reviews`);
+  });
+}
+
+startServer().catch(console.error);

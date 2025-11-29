@@ -16,6 +16,7 @@ import Watchlist from './pages/WatchList';
 import InteractiveMap from './pages/InteractiveMap';
 import Listings from './pages/Listings';
 import Reviews from './pages/Reviews';
+import Chatbot from './pages/Chatbot';
 // import MapView from './pages/MapView';
 // import Login from './pages/Login';
 // import Register from './pages/Register';
@@ -46,8 +47,9 @@ function App() {
           {/* Uncomment these routes as you create the pages */}
           <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/dashboard" element={ <ProtectedRoute> <Dashboard /> </ProtectedRoute> }/>
-          <Route path="/change-password" element={ <ProtectedRoute><ChangePassword /></ProtectedRoute> } 
-          />
+          <Route path="/change-password" element={ <ProtectedRoute><ChangePassword /></ProtectedRoute> } />
+          <Route path="/chatbot" element={<ProtectedRoute><Chatbot /></ProtectedRoute>}/>
+          
           <Route path="/map" element={<InteractiveMap />} />
           {/* <Route path="/login" element={<Login />} /> */}
           {/* <Route path="/register" element={<Register />} /> */}
