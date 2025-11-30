@@ -49,7 +49,7 @@ After cloning, open the project folder. Open terminal 2 and input the following 
 cd /database/scripts
 npm install
 ```
-**Create a new .env file with the configurations provided by the repository owner.**
+**Create a new .env file in /database/scripts with the configurations provided by the repository owner.**
 
 ### 3. Backend Setup
 Open terminal 3 and input the following commands.
