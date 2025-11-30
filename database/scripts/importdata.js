@@ -58,125 +58,7 @@ function parseMonthToDate(monthStr) {
 }
 
 // ============================================
-// 1. IMPORT AMENITIES
-// ============================================
-
-async function importAmenities() {
-  console.log('\n🗺️  Importing Amenities...');
-  const client = await pool.connect();
-  
-  try {
-    let totalImported = 0;
-
-    // Import MRT Stations
-    console.log('   📍 Importing MRT Stations...');
-    const mrtPath = path.join(__dirname, '../../data/raw/MRT Stations.csv');
-    if (fs.existsSync(mrtPath)) {
-      const mrtData = await readCSV(mrtPath);
-      let mrtCount = 0;
-      
-      for (const row of mrtData) {
-        const lat = cleanNumber(row.Latitude);
-        const lon = cleanNumber(row.Longitude);
-        
-        if (!lat || !lon) continue;
-        
-        await client.query(`
-          INSERT INTO amenity (amenity_type, name, code, geom)
-          VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326))
-        `, [
-          'MRT',
-          cleanString(row.STN_NAME),
-          cleanString(row.STN_NO),
-          lon,
-          lat
-        ]);
-        mrtCount++;
-      }
-      console.log(`      ✅ Imported ${mrtCount} MRT stations`);
-      totalImported += mrtCount;
-    }
-
-    // Import Schools
-    console.log('   🏫 Importing Schools...');
-    const schoolPath = path.join(__dirname, '../../data/raw/Generalinformationofschools.csv');
-    if (fs.existsSync(schoolPath)) {
-      const schoolData = await readCSV(schoolPath);
-      let schoolCount = 0;
-      
-      for (const row of schoolData) {
-        await client.query(`
-          INSERT INTO amenity (amenity_type, name, code, meta)
-          VALUES ($1, $2, $3, $4)
-        `, [
-          'SCHOOL',
-          cleanString(row.school_name),
-          cleanString(row.postal_code),
-          JSON.stringify({
-            address: cleanString(row.address),
-            principal: cleanString(row.principal_name),
-            type: cleanString(row.type_code),
-            level: cleanString(row.mainlevel_code)
-          })
-        ]);
-        schoolCount++;
-      }
-      console.log(`      ✅ Imported ${schoolCount} schools`);
-      totalImported += schoolCount;
-    }
-
-    // Import EV Chargers
-    console.log('   ⚡ Importing EV Chargers...');
-    const evPath = path.join(__dirname, '../../data/raw/Electric_Vehicle_Charging_Points.csv');
-    if (fs.existsSync(evPath)) {
-      const evData = await readCSV(evPath);
-      let evCount = 0;
-      
-      for (const row of evData) {
-        const lat = cleanNumber(row.Latitude);
-        const lon = cleanNumber(row.Longitude);
-        
-        if (!lat || !lon) continue;
-        
-        await client.query(`
-          INSERT INTO amenity (amenity_type, name, operator, code, geom, meta)
-          VALUES ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7)
-        `, [
-          'EV_CHARGER',
-          cleanString(row.Name),
-          cleanString(row['Building Name']),
-          cleanString(row['EV Charger Registration Code']),
-          lon,
-          lat,
-          JSON.stringify({
-            outlets: cleanNumber(row['No. of Charging Outlets']),
-            connector_type: cleanString(row['Type of Connector']),
-            power_kw: cleanNumber(row['Rated Output Power (kW)']),
-            public: cleanString(row['Is the charger publicly accessible?'])
-          })
-        ]);
-        evCount++;
-        
-        if (evCount % 1000 === 0) {
-          console.log(`      Processing: ${evCount} / ${evData.length}`);
-        }
-      }
-      console.log(`      ✅ Imported ${evCount} EV chargers`);
-      totalImported += evCount;
-    }
-
-    console.log(`   ✅ Total amenities imported: ${totalImported}`);
-    
-  } catch (error) {
-    console.error('   ❌ Error importing amenities:', error.message);
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-// ============================================
-// 2. IMPORT AND NORMALIZE RESALE DATA
+// IMPORT AND NORMALIZE RESALE DATA
 // ============================================
 
 async function importResaleTransactions() {
@@ -345,20 +227,6 @@ async function importResaleTransactions() {
 }
 
 // ============================================
-// 3. CALCULATE PROXIMITIES (Optional - computationally intensive)
-// ============================================
-
-async function calculateProximities() {
-  console.log('\n📏 Calculating Flat-Amenity Proximities...');
-  console.log('   ⚠️  This is computationally intensive and may take 30+ minutes');
-  console.log('   💡 You can skip this and run it separately later');
-  
-  // TODO: Implement proximity calculations using PostGIS distance functions
-  // This would calculate distances from each flat to nearby amenities
-  console.log('   ⏭️  Skipping for now - run separately for production');
-}
-
-// ============================================
 // MAIN EXECUTION
 // ============================================
 
@@ -376,10 +244,8 @@ async function main() {
     testClient.release();
     
     // Import in order
-    await importAmenities();           // ~10K records, ~30 seconds
     await importResaleTransactions();  // ~217K records, ~5-10 minutes
-    // await calculateProximities();   // Optional, very slow
-    
+   
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     
@@ -395,7 +261,6 @@ async function main() {
         (SELECT COUNT(*) FROM hdbblock) as block_count,
         (SELECT COUNT(*) FROM hdbflat) as flat_count,
         (SELECT COUNT(*) FROM resale_transaction) as transaction_count,
-        (SELECT COUNT(*) FROM amenity) as amenity_count
     `);
     
     console.log('\n📊 Database Summary:');
@@ -403,7 +268,6 @@ async function main() {
     console.log(`   HDB Blocks: ${stats.rows[0].block_count}`);
     console.log(`   HDB Flats: ${stats.rows[0].flat_count}`);
     console.log(`   Transactions: ${stats.rows[0].transaction_count}`);
-    console.log(`   Amenities: ${stats.rows[0].amenity_count}`);
     console.log('\n🎉 Ready to use!');
     
   } catch (error) {

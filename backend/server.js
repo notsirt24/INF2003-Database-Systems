@@ -338,6 +338,7 @@ async function startServer() {
     console.log(`✅ Server running on http://localhost:${PORT}`);
     console.log(`📊 Dashboard API: http://localhost:${PORT}/api/dashboard`);
     console.log(`🔐 Auth API: http://localhost:${PORT}/api/auth`);
+    console.log(`🗺️ Map API: http://localhost:${PORT}/api/map`);
     console.log(`🤖 Chatbot API: http://localhost:${PORT}/api/chatbot`);
     console.log(`🔍 Test endpoints available at /api/test-postgres and /api/test-mongodb`);
     console.log(`📝 Reviews API: http://localhost:${PORT}/api/reviews`);
