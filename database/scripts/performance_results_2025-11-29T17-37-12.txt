@@ -1,0 +1,108 @@
+======================================================================
+HDB SMART ANALYTICS PLATFORM
+DATABASE PERFORMANCE BENCHMARK RESULTS
+Generated: 11/30/2025, 1:37:12 AM
+======================================================================
+
+POSTGRESQL RESULTS
+----------------------------------------------------------------------
+
+Test: dashboard
+  Description: Dashboard price statistics query
+  Iterations: 100
+  Total time: 781 ms
+  Average time: 7.81 ms
+  Queries per second: 128.04
+
+Test: listings
+  Description: Complex JOIN query with filters
+  Iterations: 100
+  Total time: 1758 ms
+  Average time: 17.58 ms
+  Queries per second: 56.88
+
+Test: watchlist
+  Description: User watchlist retrieval
+  Iterations: 100
+  Total time: 853 ms
+  Average time: 8.53 ms
+  Queries per second: 117.23
+
+Test: prediction
+  Description: Price prediction cache query
+  Iterations: 100
+  Total time: 722 ms
+  Average time: 7.22 ms
+  Queries per second: 138.50
+
+Test: aggregation
+  Description: Town comparison aggregation
+  Iterations: 50
+  Total time: 5594 ms
+  Average time: 111.88 ms
+  Queries per second: 8.94
+
+PostgreSQL Database Statistics:
+  Size: 73 MB
+  Transactions: 217523
+  Towns: 26
+  Flats: 93651
+  Watchlist items: 15
+
+
+MONGODB RESULTS
+----------------------------------------------------------------------
+
+Test: geospatial_mrt
+  Description: Geospatial query for MRT stations
+  Iterations: 100
+  Total time: 701 ms
+  Average time: 7.01 ms
+  Queries per second: 142.65
+
+Test: geospatial_schools
+  Description: Geospatial query for schools
+  Iterations: 100
+  Total time: 1129 ms
+  Average time: 11.29 ms
+  Queries per second: 88.57
+
+Test: chat_history
+  Description: Chat conversation history
+  Iterations: 100
+  Total time: 1074 ms
+  Average time: 10.74 ms
+  Queries per second: 93.11
+
+Test: chat_analytics
+  Description: Intent distribution aggregation
+  Iterations: 50
+  Total time: 454 ms
+  Average time: 9.08 ms
+  Queries per second: 110.13
+
+Test: review_search
+  Description: Text search with regex
+  Iterations: 100
+  Total time: 997 ms
+  Average time: 9.97 ms
+  Queries per second: 100.30
+
+MongoDB Database Statistics:
+  Size: 7.81 MB
+  Collections: 9
+  Chat logs: 98
+  MRT stations: 171
+  Community reviews: 2
+
+
+PERFORMANCE COMPARISON
+----------------------------------------------------------------------
+PostgreSQL average response time: 30.60 ms
+MongoDB average response time: 9.62 ms
+Faster database: MongoDB
+Performance difference: 68.57%
+
+======================================================================
+END OF REPORT
+======================================================================

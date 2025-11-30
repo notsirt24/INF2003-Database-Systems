@@ -1,0 +1,363 @@
+
+================================================================================
+  CHATBOT INSIGHTS & USER BEHAVIOR ANALYSIS
+================================================================================
+Generated: 11/30/2025, 2:38:28 AM
+Database: INF2006-Database_Systems
+
+================================================================================
+  TOP 20 MOST ASKED QUESTIONS
+================================================================================
+
+Rank | Count | Success | Question
+--------------------------------------------------------------------------------
+
+ 1. [11x] 100% success
+    ████████████████████
+    "Show me 4-room transactions in Tampines"
+    Intent(s): search_flats
+    Avg results: 20.0
+
+ 2. [5x] 100% success
+    ██████████
+    "What are the cheapest past HDB sales?"
+    Intent(s): cheapest_options
+    Avg results: 10.0
+
+ 3. [4x] 0% success
+    ████████
+    "Show me 4-room flats in Punggol under $600k near MRT stations."
+    Intent(s): search_flats
+    Avg results: 6.7
+
+ 4. [4x] 0% success
+    ████████
+    "What is the price trend for 3-room flats in Bishan since 2015?"
+    Intent(s): price_trend
+    Avg results: 0.0
+
+ 5. [4x] 0% success
+    ████████
+    "Find recent resale transactions for 4-room flats in Tampines."
+    Intent(s): search_flats
+    Avg results: 6.7
+
+ 6. [4x] 100% success
+    ████████
+    "Compare transaction prices between Punggol and Sengkang"
+    Intent(s): compare_towns
+    Avg results: 0.0
+
+ 7. [3x] 100% success
+    ██████
+    "Most expensive 5-room flats in 2022"
+    Intent(s): most_expensive
+    Avg results: 10.0
+
+ 8. [3x] 100% success
+    ██████
+    "Which towns had most transactions?"
+    Intent(s): popular_towns
+    Avg results: 0.0
+
+ 9. [2x] 100% success
+    ████
+    "help"
+    Intent(s): search_flats, general
+    Avg results: 10.0
+
+10. [2x] 100% success
+    ████
+    "Compare Punggol and Sengkang"
+    Intent(s): compare_towns
+    Avg results: 0.0
+
+11. [2x] 100% success
+    ████
+    "Show me recent 4-room flats in Tampines"
+    Intent(s): search_flats
+    Avg results: 20.0
+
+12. [2x] 100% success
+    ████
+    "What are the cheapest HDB options available?"
+    Intent(s): cheapest_options
+    Avg results: 10.0
+
+13. [2x] 0% success
+    ████
+    "Compare average prices of 5-room flats in Jurong West and Woodlands."
+    Intent(s): compare_towns
+    Avg results: 0.0
+
+14. [2x] 100% success
+    ████
+    "Price trend for 4-room in Bishan"
+    Intent(s): price_trend
+    Avg results: 0.0
+
+15. [2x] 100% success
+    ████
+    "Compare prices between Punggol and Sengkang"
+    Intent(s): compare_towns
+    Avg results: 0.0
+
+16. [1x] 100% success
+    ██
+    "predict prices for 4 room flats in 2026"
+    Intent(s): price_trend
+    Avg results: 0.0
+
+17. [1x] 100% success
+    ██
+    "show me 4 room flats near 1km of a school in ANG MO KIO"
+    Intent(s): search_flats
+    Avg results: 20.0
+
+18. [1x] 100% success
+    ██
+    "Show me 4 room transactions in Tampines"
+    Intent(s): search_flats
+    Avg results: 0.0
+
+19. [1x] 100% success
+    ██
+    "price trend for 4 room in bishan in 10 years time"
+    Intent(s): price_trend
+    Avg results: 0.0
+
+20. [1x] 100% success
+    ██
+    "show me 4 room transactions in punggol year 2017"
+    Intent(s): search_flats
+    Avg results: 20.0
+
+================================================================================
+  QUESTIONS THE BOT COULDN'T ANSWER
+================================================================================
+
+Total Failed Queries: 0
+
+No failed queries found - Great job!
+
+================================================================================
+  QUERIES WITH LOW SUCCESS RATE (< 70%)
+================================================================================
+
+Queries that frequently fail:
+--------------------------------------------------------------------------------
+
+1. Success Rate: 0.0% (0/4)
+   "Show me 4-room flats in Punggol under $600k near MRT stations."
+   Intent(s): search_flats
+
+2. Success Rate: 0.0% (0/4)
+   "What is the price trend for 3-room flats in Bishan since 2015?"
+   Intent(s): price_trend
+
+3. Success Rate: 0.0% (0/4)
+   "Find recent resale transactions for 4-room flats in Tampines."
+   Intent(s): search_flats
+
+================================================================================
+  INTENT POPULARITY & SUCCESS RATES
+================================================================================
+
+Intent                  Queries   Unique    Success   Avg Results
+--------------------------------------------------------------------------------
+search_flats             40        23        75.0%     16.0
+  ████████████████████
+compare_towns            16        10        87.5%     0.0
+  ████████
+cheapest_options         14        9         100.0%    9.3
+  ███████
+price_trend              11        7         63.6%     0.0
+  ██████
+most_expensive           8         6         100.0%    8.8
+  ████
+popular_towns            7         5         100.0%    0.0
+  ████
+price_prediction         1         1         100.0%    0.0
+  █
+general                  1         1         100.0%    0.0
+  █
+
+================================================================================
+  WHAT USERS ARE SEARCHING FOR
+================================================================================
+
+--------------------------------------------------------------------------------
+  Most Searched Towns
+--------------------------------------------------------------------------------
+
+Rank | Town                  Searches    Avg Results    Common Intents
+--------------------------------------------------------------------------------
+ 1. PUNGGOL                    26          6.1            cheapest_options, compare_towns
+     ███████████████
+ 2. TAMPINES                   22          16.2           compare_towns, search_flats
+     █████████████
+ 3. BISHAN                     8           0.0            price_trend
+     █████
+ 4. SENGKANG                   3           6.7            compare_towns, most_expensive
+     ██
+ 5. JURONG WEST                2           0.0            compare_towns
+     ██
+ 6. ANG MO KIO                 2           20.0           search_flats
+     ██
+ 7. BEDOK                      1           0.0            price_prediction
+     █
+ 8. BUKIT BATOK                1           0.0            price_trend
+     █
+ 9. HOUGANG                    1           15.0           search_flats
+     █
+10. PASIR RIS                  1           20.0           search_flats
+     █
+
+--------------------------------------------------------------------------------
+  Most Searched Flat Types
+--------------------------------------------------------------------------------
+
+Flat Type          Searches    Avg Results
+--------------------------------------------------
+4 ROOM              20          13.5
+  ████████████████████
+4-ROOM              19          10.7
+  ███████████████████
+3-ROOM              5           0.0
+  █████
+5 ROOM              5           10.0
+  █████
+5-ROOM              2           0.0
+  ██
+EXECUTIVE           2           20.0
+  ██
+2 ROOM              1           10.0
+  █
+3 ROOM              1           15.0
+  █
+2-ROOM              1           0.0
+  █
+
+--------------------------------------------------------------------------------
+  Price Range Usage
+--------------------------------------------------------------------------------
+
+Queries with minimum price filter: 1
+Queries with maximum price filter: 6
+Queries with price range (both): 1
+Average max price searched: $900,000
+
+--------------------------------------------------------------------------------
+  Year Filter Usage
+--------------------------------------------------------------------------------
+
+Year     Searches
+------------------------------
+2026      1 ████████████████████
+2022      3 ████████████████████████████████████████████████████████████
+2020      3 ████████████████████████████████████████████████████████████
+2019      3 ████████████████████████████████████████████████████████████
+2018      4 ████████████████████████████████████████████████████████████████████████████████
+2017      2 ████████████████████████████████████████
+
+================================================================================
+  🏘️  POPULAR TOWN + FLAT TYPE COMBINATIONS
+================================================================================
+
+Rank | Town + Flat Type                     Searches    Avg Results
+--------------------------------------------------------------------------------
+ 1. TAMPINES - 4 ROOM                         10          20.0
+ 2. TAMPINES - 4-ROOM                         10          11.1
+ 3. PUNGGOL - 4-ROOM                          8           8.0
+ 4. BISHAN - 3-ROOM                           4           0.0
+ 5. BISHAN - 4 ROOM                           3           0.0
+ 6. PUNGGOL - 4 ROOM                          3           16.7
+ 7. JURONG WEST - 5-ROOM                      2           0.0
+ 8. SENGKANG - 5 ROOM                         1           10.0
+ 9. TAMPINES - EXECUTIVE                      1           20.0
+10. ANG MO KIO - 4 ROOM                       1           20.0
+11. SENGKANG - 2 ROOM                         1           10.0
+12. HOUGANG - 3 ROOM                          1           15.0
+13. PUNGGOL - 5 ROOM                          1           10.0
+14. BEDOK - 4 ROOM                            1           0.0
+15. PUNGGOL - EXECUTIVE                       1           20.0
+
+================================================================================
+  PRICE PREDICTION QUERIES
+================================================================================
+
+Total prediction queries: 1
+Unique towns predicted: 1
+Unique flat types predicted: 1
+
+Prediction year range: 2035 to 2035
+Average prediction year: 2035
+Users typically predict 10 years ahead
+
+--------------------------------------------------------------------------------
+  Most Requested Predictions
+--------------------------------------------------------------------------------
+
+Rank | Prediction Query                               Count
+--------------------------------------------------------------------------------
+ 1. BEDOK - 4 ROOM in 2035                              1
+
+================================================================================
+  COMPARISON QUERIES
+================================================================================
+
+Top Town Comparisons:
+--------------------------------------------------------------------------------
+1. PUNGGOL vs SENGKANG - 9 times
+2. JURONG WEST vs WOODLANDS - 2 times
+3. TAMPINES vs PUNGGOL - 1 times
+4. null vs SENGKANG - 1 times
+5. PUNGGOL vs TAMPINES - 1 times
+6. PUNGGOL vs JURONG WEST - 1 times
+7. SENGKANG vs null - 1 times
+
+================================================================================
+  ACTIONABLE INSIGHTS & RECOMMENDATIONS
+================================================================================
+
+ Overall Performance:
+   Total queries: 98
+   Successful: 82 (83.7%)
+   Failed: 0
+
+Key Findings:
+
+1. Most Popular Feature:
+   "search_flats" with 40 queries
+   -> This is what users use most - ensure it works perfectly!
+
+2. Needs Improvement:
+   "price_trend" has only 63.6% success rate
+   -> Review why this intent frequently fails
+
+3. Hottest Town:
+   "PUNGGOL" with 26 searches
+   -> Consider adding more features for this town
+
+4. Most Popular Flat Type:
+   "4 ROOM" with 20 searches
+   -> Ensure you have good data coverage for this flat type
+
+6. Data Gaps:
+   35 queries (35.7%) returned zero results
+   -> Consider expanding your database or adjusting filters
+
+7. User Engagement:
+   1 unique users
+   98.0 queries per user on average
+   -> High engagement! Users find the bot useful
+
+================================================================================
+  ANALYSIS COMPLETE
+================================================================================
+
+Next Steps:
+1. Review failed queries to improve bot understanding
+2. Optimize low-performing intents
+3. Ensure good data coverage for popular towns/flat types
+4. Consider adding features for common query patterns

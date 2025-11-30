@@ -1,5 +1,4 @@
 // backend/routes/chatbotRoutes.js
-// COMPLETE - Price prediction + row limit + all fixes
 
 const express = require('express');
 const router = express.Router();
@@ -755,7 +754,7 @@ router.post('/', async (req, res) => {
           success: true
         });
       } catch (mongoError) {
-        console.error('⚠️ MongoDB:', mongoError.message);
+        console.error('MongoDB:', mongoError.message);
       }
     }
 

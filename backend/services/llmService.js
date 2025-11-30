@@ -1,5 +1,4 @@
 // backend/services/llmService.js
-// COMPLETE - Price prediction + row limit + all fixes
 
 const axios = require('axios');
 
